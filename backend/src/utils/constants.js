@@ -1,0 +1,38 @@
+/**
+ * Constantes globais do sistema
+ */
+
+const ROLES = {
+    ADMIN: 'admin',
+    MOTORISTA: 'motorista'
+};
+
+const STATUS = {
+    ATIVO: 'ativo',
+    INATIVO: 'inativo'
+};
+
+const ITEM_STATUS = {
+    OK: 'OK',
+    RUIM: 'RUIM'
+};
+
+const ERROR_CODES = {
+    VALIDATION_ERROR: 'VALIDATION_ERROR',
+    AUTH_FAILED: 'AUTH_FAILED',
+    TOKEN_INVALID: 'TOKEN_INVALID',
+    TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+    INSUFFICIENT_PERMISSION: 'INSUFFICIENT_PERMISSION',
+    RESOURCE_NOT_FOUND: 'RESOURCE_NOT_FOUND',
+    DUPLICATE_ENTRY: 'DUPLICATE_ENTRY',
+    KM_INVALID: 'KM_INVALID',
+    DB_ERROR: 'DB_ERROR',
+    INTERNAL_ERROR: 'INTERNAL_ERROR'
+};
+
+module.exports = {
+    ROLES,
+    STATUS,
+    ITEM_STATUS,
+    ERROR_CODES
+};

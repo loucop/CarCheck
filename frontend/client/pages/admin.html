@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarCheck - Painel Administrativo v3.0</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .admin-container { 
+            padding: 20px; 
+            max-width: 1400px; 
+            margin: auto; 
+        }
+        
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .btn-voltar {
+            background: #64748b;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        
+        .btn-voltar:hover {
+            background: #475569;
+        }
+        
+        .filtros-container {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .filtros-container label {
+            font-weight: bold;
+            color: #334155;
+        }
+        
+        .filtros-container select {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            min-width: 250px;
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+            background: #fff; 
+            color: #000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        th, td { 
+            padding: 14px; 
+            border: 1px solid #e5e7eb; 
+            text-align: left; 
+        }
+        
+        th { 
+            background-color: #1e293b; 
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+        
+        tr:nth-child(even) { 
+            background-color: #f9fafb; 
+        }
+        
+        tr:hover {
+            background-color: #f1f5f9;
+        }
+        
+        .btn-refresh { 
+            background: #10b981; 
+            color: white; 
+            padding: 12px 24px; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 6px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        
+        .btn-refresh:hover {
+            background: #059669;
+        }
+        
+        .btn-novo-func {
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        
+        .btn-novo-func:hover {
+            background: #2563eb;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .modal-close {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            cursor: pointer;
+            font-size: 28px;
+            color: #64748b;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-close:hover {
+            color: #ef4444;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #334155;
+        }
+        
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <div>
+                <h1 style="margin: 0; color: #1e293b;">Relatório de Inspeções</h1>
+                <p style="margin: 5px 0 0 0; color: #64748b;">Auditoria completa de checklists realizados</p>
+            </div>
+            <button onclick="window.location.href='menu.html'" class="btn-voltar">
+                &larr; Voltar ao Menu
+            </button>
+        </div>
+
+        <div class="filtros-container">
+            <label for="filtroFuncionario">Filtrar por Funcionário:</label>
+            <select id="filtroFuncionario">
+                <option value="">Carregando...</option>
+            </select>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button class="btn-refresh" onclick="carregarRelatorios(filtroAtivo)">
+                Atualizar Dados
+            </button>
+            <button class="btn-novo-func" onclick="abrirModalFuncionario()">
+                + Novo Funcionário
+            </button>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Data/Hora</th>
+                    <th>Motorista</th>
+                    <th>Veículo</th>
+                    <th>KM / Rota</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabela">
+                <tr><td colspan="6" style="text-align:center; padding: 20px;">Carregando...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal: Cadastro de Funcionário -->
+    <div id="modalFuncionario" class="modal">
+        <div class="modal-content">
+            <button onclick="fecharModalFuncionario()" class="modal-close">&times;</button>
+            <h2 style="margin-top: 0; color: #1e293b;">Cadastrar Funcionário</h2>
+            
+            <form id="formFuncionario">
+                <div class="input-group">
+                    <label>Nome Completo:</label>
+                    <input type="text" id="cad_nome" placeholder="Ex: João Silva" required>
+                </div>
+                
+                <div class="input-group">
+                    <label>CPF (apenas números):</label>
+                    <input type="text" id="cad_cpf" maxlength="11" placeholder="12345678901" required>
+                </div>
+                
+                <div class="input-group">
+                    <label>Matrícula:</label>
+                    <input type="text" id="cad_id" placeholder="Matrícula do Funcionário" required>
+                </div>
+
+                <div class="input-group">
+                    <label>Senha de Acesso:</label>
+                    <input type="password" id="cad_senha" placeholder="Senha" required>
+                </div>
+
+                <div class="input-group">
+                    <label>Nível de Acesso:</label>
+                    <select id="cad_cargo" required>
+                        <option value="motorista">Motorista (Apenas Checklist)</option>
+                        <option value="admin">Administrador (Acesso Total)</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" style="flex: 2; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        Salvar Cadastro
+                    </button>
+                    <button type="button" onclick="fecharModalFuncionario()" style="flex: 1; padding: 12px; background: #94a3b8; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes do Checklist -->
+    <div id="modalDetalhes" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <button onclick="fecharModal()" class="modal-close">&times;</button>
+            <h2 style="margin-top: 0; color: #1e293b;">Detalhes da Inspeção</h2>
+            <div id="containerDesenho"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Histórico por Veículo -->
+    <div id="modalHistorico" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <button onclick="fecharModalHistorico()" class="modal-close">&times;</button>
+            <h2 style="margin-top: 0; color: #1e293b;">Histórico do Veículo</h2>
+            <div id="containerHistorico"></div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/admin.js"></script>
+</body>
+</html>

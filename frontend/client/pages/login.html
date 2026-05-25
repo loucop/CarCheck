@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FrotaControl - Login</title>
+    <link rel="stylesheet" href="../css/style.css" />
+  </head>
+  <body>
+    <div class="card">
+      <header style="text-align: center; margin-bottom: 20px">
+        <h2 style="color: #3b82f6">FrotaControl</h2>
+        <p style="font-size: 0.9em; color: #94a3b8">Acesso Operacional</p>
+      </header>
+
+      <form id="loginForm">
+        <div class="input-group">
+          <label for="usuario">CPF ou Matrícula</label>
+          <input
+            type="text"
+            id="usuario"
+            placeholder="Digite seu acesso"
+            required
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" placeholder="••••••" required />
+        </div>
+
+        <button type="submit">ENTRAR NO SISTEMA</button>
+      </form>
+    </div>
+    <script src="../js/config.js"></script>
+    <script src="../js/auth.js"></script>
+  </body>
+</html>

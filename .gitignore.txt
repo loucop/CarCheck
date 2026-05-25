@@ -1,0 +1,16 @@
+# Dependencies
+backend/node_modules/
+
+# Environment variables (NEVER commit this)
+backend/.env
+
+# Uploaded files (runtime data, not source)
+backend/public/uploads/
+
+# OS garbage
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

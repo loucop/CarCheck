@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FrotaControl - FOR 181 v2.0</title>
+    <link rel="stylesheet" href="../css/style.css">
+
+    <style>
+      .checklist-container {
+        background: #1e293b;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 10px;
+      }
+      .item-row {
+        border-bottom: 1px solid #334155;
+        padding: 12px 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .status-btns {
+        display: flex;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .btn-opt {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        background: #475569;
+        color: white;
+      }
+      .btn-opt.active-ok {
+        background: #10b981 !important;
+      }
+      .btn-opt.active-ruim {
+        background: #ef4444 !important;
+      }
+      .obs-field {
+        width: 100%;
+        padding: 8px;
+        background: #0f172a;
+        border: 1px solid #475569;
+        color: white;
+        display: none;
+        margin-top: 5px;
+        border-radius: 4px;
+      }
+      canvas {
+        background: white;
+        width: 100%;
+        border-radius: 4px;
+        cursor: crosshair;
+        touch-action: none;
+        border: 2px solid #334155;
+      }
+      .header-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .header-info input {
+        padding: 12px;
+        border-radius: 4px;
+        border: 1px solid #334155;
+        background: #0f172a;
+        color: white;
+      }
+      .data-sistema {
+        color: #94a3b8;
+        font-size: 0.9rem;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+      /* NOVO: Seção de rotas destacada */
+      .rota-section {
+        background: #0f172a;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 15px 0;
+        border-left: 4px solid #3b82f6;
+      }
+      .rota-section h3 {
+        color: #3b82f6;
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" style="max-width: 800px; margin: 20px auto">
+      <div
+        class="navigation-header"
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 15px;
+        "
+      >
+        <button
+          onclick="voltarSelecao()"
+          style="
+            background: #475569;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            border-radius: 6px;
+          "
+        >
+          ← Voltar / Trocar Veículo
+        </button>
+      </div>
+
+      <h2>FOR 181 - Inspeção de Veículo v2.0</h2>
+      <p
+        id="placa-topo"
+        style="
+          color: #3b82f6;
+          font-weight: bold;
+          font-size: 1.2rem;
+          margin-bottom: 5px;
+        "
+      ></p>
+      <div id="data-display" class="data-sistema"></div>
+
+      <div class="header-info">
+        <input
+          type="text"
+          id="motorista"
+          placeholder="Nome do Motorista"
+          readonly
+          style="background: #1e293b; color: #94a3b8; cursor: not-allowed"
+        />
+        <input
+          type="text"
+          id="matricula"
+          placeholder="Matrícula"
+          readonly
+          style="background: #1e293b; color: #94a3b8; cursor: not-allowed"
+        />
+        <input type="number" id="km" placeholder="KM Atual *" required />
+      </div>
+
+      <!-- NOVO: Seção de Rotas -->
+      <div class="rota-section">
+        <h3>📍 Informações de Rota</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <input 
+            type="text" 
+            id="local_origem" 
+            placeholder="Local de Origem (Ex: Garagem Central)"
+            style="padding: 12px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;"
+          />
+          <input 
+            type="text" 
+            id="local_destino" 
+            placeholder="Local de Destino (Ex: Posto 02)"
+            style="padding: 12px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;"
+          />
+        </div>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 8px; margin-bottom: 0;">
+          💡 Campos opcionais - úteis para auditoria de quilometragem
+        </p>
+      </div>
+
+      <h3 style="margin-top: 20px;">Checklist de Conformidade</h3>
+      <div id="listaItens" class="checklist-container"></div>
+
+      <h3 style="margin-top: 25px">Mapa de Avarias (Lataria)</h3>
+      <canvas id="canvasAvaria" width="600" height="300"></canvas>
+      <button
+        onclick="limparCanvas()"
+        style="background: #64748b; margin-top: 5px; padding: 8px 15px"
+      >
+        🗑️ Limpar Mapa
+      </button>
+
+      <button
+        type="button"
+        onclick="finalizarRelatorio(event)"
+        style="
+          background: #10b981;
+          width: 100%;
+          padding: 20px;
+          margin-top: 30px;
+          font-weight: bold;
+          font-size: 1.1rem;
+          cursor: pointer;
+          border: none;
+          border-radius: 8px;
+          color: white;
+        "
+      >
+        ✅ FINALIZAR CHECKLIST E GERAR RELATÓRIO
+      </button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/pdf-engine.js"></script>
+    <script src="../js/checklist.js"></script>
+  </body>
+</html>
