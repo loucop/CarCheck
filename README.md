@@ -1,6 +1,7 @@
 # CarCheck v3.0
 
-**Sistema de inspeção e auditoria de frota para equipes de segurança operacional.** Substitui checklists em papel por um fluxo de dados digital em tempo real — pronto para mobile, seguro via JWT e construído para uptime 24/7.
+**Sistema de inspeção e auditoria de frota para equipes de segurança operacional.** Substitui checklists em papel por um fluxo de dados digital em tempo real — pronto para mobile, seguro via JWT e construído para uptime 
+contínuo.
 
 ---
 
