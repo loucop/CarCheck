@@ -1,5 +1,5 @@
 // ==========================================
-// CHECKLIST.JS v3.0 - Com JWT e estrutura v3.0
+// CHECKLIST.JS v3.0 - Com JWT e Debug
 // ==========================================
 
 const itensChecklist = [
@@ -176,12 +176,27 @@ async function finalizarRelatorio(event) {
   const veiculoId = parseInt(localStorage.getItem("veiculo_id"));
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
 
-  // CRÍTICO: Usar matricula, não id
-  const matricula = user.matricula;
+  const matricula = String(user.matricula);
 
-  if (isNaN(veiculoId)) return alert("❌ ERRO: Veículo não selecionado.");
-  if (!kmInput) return alert("❌ ERRO: Informe o KM atual.");
-  if (!matricula) return alert("❌ ERRO: Matrícula não encontrada. Faça login novamente.");
+  // VALIDAÇÕES
+  console.log('[DEBUG] Iniciando finalizarRelatorio');
+  console.log('[DEBUG] kmInput:', kmInput);
+  console.log('[DEBUG] veiculoId:', veiculoId);
+  console.log('[DEBUG] matricula:', matricula);
+  console.log('[DEBUG] user:', user);
+
+  if (isNaN(veiculoId)) {
+    alert("❌ ERRO: Veículo não selecionado.");
+    return;
+  }
+  if (!kmInput) {
+    alert("❌ ERRO: Informe o KM atual.");
+    return;
+  }
+  if (!matricula) {
+    alert("❌ ERRO: Matrícula não encontrada. Faça login novamente.");
+    return;
+  }
 
   const statusDosItens = {};
   document.querySelectorAll(".item-row").forEach((row) => {
@@ -192,6 +207,9 @@ async function finalizarRelatorio(event) {
     };
   });
 
+  const canvasData = canvas.toDataURL("image/png");
+  console.log('[DEBUG] Canvas tamanho:', canvasData.length, 'caracteres');
+
   const payload = {
     veiculo_id: veiculoId,
     matricula: matricula,
@@ -199,8 +217,10 @@ async function finalizarRelatorio(event) {
     local_origem: document.getElementById("local_origem")?.value || "",
     local_destino: document.getElementById("local_destino")?.value || "",
     itens_status: statusDosItens,
-    mapa_avaria_base64: canvas.toDataURL("image/png"),
+    mapa_avaria_base64: canvasData,
   };
+
+  console.log('[DEBUG] Payload:', JSON.stringify(payload, null, 2).substring(0, 500));
 
   try {
     const resposta = await fetch(`${CONFIG.API_BASE_URL}/checklist`, {
@@ -212,7 +232,10 @@ async function finalizarRelatorio(event) {
       body: JSON.stringify(payload),
     });
 
+    console.log('[DEBUG] Status da resposta:', resposta.status);
+
     const resultado = await resposta.json();
+    console.log('[DEBUG] Resposta do servidor:', resultado);
 
     if (resposta.status === 401) {
       alert("Sessão expirada. Faça login novamente.");
@@ -225,10 +248,11 @@ async function finalizarRelatorio(event) {
       alert("✅ Checklist registrado com sucesso!");
       window.location.href = "menu.html";
     } else {
-      alert(`❌ Erro: ${resultado.error}`);
+      console.error('[ERRO] Detalhes:', resultado);
+      alert(`❌ Erro: ${resultado.error || JSON.stringify(resultado)}`);
     }
   } catch (erro) {
-    console.error("Erro:", erro);
+    console.error("Erro de rede:", erro);
     alert("❌ Erro de comunicação com o servidor.");
   }
 }

@@ -2,9 +2,6 @@ const { z } = require('zod');
 const response = require('../utils/response');
 const { ERROR_CODES } = require('../utils/constants');
 
-/**
- * Middleware genérico de validação Zod
- */
 const validate = (schema, source = 'body') => {
     return (req, res, next) => {
         try {
@@ -17,7 +14,9 @@ const validate = (schema, source = 'body') => {
                     field: e.path.join('.'),
                     message: e.message
                 }));
-                
+
+                console.error('[VALIDATION ERROR]', JSON.stringify(errors));
+
                 return res.status(400).json({
                     success: false,
                     error: 'Dados inválidos',
@@ -30,15 +29,12 @@ const validate = (schema, source = 'body') => {
     };
 };
 
-// Schemas de validação
 const schemas = {
-    // Login
     login: z.object({
         matricula: z.string().min(1, 'Matrícula obrigatória'),
         senha: z.string().min(1, 'Senha obrigatória')
     }),
-    
-    // Cadastro de funcionário
+
     createFuncionario: z.object({
         matricula: z.string().min(1, 'Matrícula obrigatória'),
         nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -48,32 +44,25 @@ const schemas = {
             errorMap: () => ({ message: "Nível de acesso deve ser 'admin' ou 'motorista'" })
         })
     }),
-    
-    // Checklist
+
+    // matricula usa coerce para aceitar número ou string (ex: matricula = 3)
     createChecklist: z.object({
         veiculo_id: z.coerce.number().int().positive('ID do veículo inválido'),
-        matricula: z.string().min(1, 'Matrícula obrigatória'),
+        matricula: z.coerce.string().min(1, 'Matrícula obrigatória'),
         km_entrada: z.coerce.number().nonnegative('KM não pode ser negativo'),
         local_origem: z.string().optional().nullable(),
         local_destino: z.string().optional().nullable(),
         itens_status: z.union([
-            z.string(),
-            z.record(
-                z.object({
-                    status: z.enum(['OK', 'RUIM']),
-                    obs: z.string().optional()
-                })
-            )
+            z.string().min(1),
+            z.record(z.any())
         ]),
         mapa_avaria_base64: z.string().optional()
     }),
-    
-    // Histórico de veículo
+
     historicoVeiculo: z.object({
         id: z.coerce.number().int().positive('ID do veículo inválido')
     }),
-    
-    // Relatório admin
+
     relatorioAdmin: z.object({
         funcionario_id: z.string().optional(),
         limit: z.coerce.number().int().positive().max(500).default(100),
@@ -81,7 +70,4 @@ const schemas = {
     })
 };
 
-module.exports = {
-    validate,
-    schemas
-};
+module.exports = { validate, schemas };

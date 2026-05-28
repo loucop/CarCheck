@@ -1,13 +1,4 @@
-/**
- * Repository: Checklists
- * Schema Real: id, veiculo_id, matricula, km_entrada, itens_status, 
- *              mapa_avaria_base64, data_inspecao, local_origem, local_destino
- */
-
 const checklistRepository = {
-    /**
-     * Criar novo checklist
-     */
     async create(conn, data) {
         const query = `
             INSERT INTO checklists 
@@ -26,9 +17,6 @@ const checklistRepository = {
         return result.insertId;
     },
 
-    /**
-     * Buscar histórico de veículo
-     */
     async findHistoricoByVeiculo(conn, veiculoId, limit, offset) {
         const query = `
             SELECT 
@@ -50,22 +38,12 @@ const checklistRepository = {
         return await conn.query(query, [veiculoId, limit, offset]);
     },
 
-    /**
-     * Contar total de checklists de um veículo
-     */
     async countByVeiculo(conn, veiculoId) {
-        const query = `
-            SELECT COUNT(*) as total 
-            FROM checklists 
-            WHERE veiculo_id = ?
-        `;
+        const query = `SELECT COUNT(*) as total FROM checklists WHERE veiculo_id = ?`;
         const rows = await conn.query(query, [veiculoId]);
         return rows[0].total;
     },
 
-    /**
-     * Buscar relatório administrativo
-     */
     async findRelatorio(conn, funcionarioMatricula, limit, offset) {
         let query = `
             SELECT 
@@ -86,23 +64,20 @@ const checklistRepository = {
             LEFT JOIN veiculos v ON v.id = c.veiculo_id
             LEFT JOIN funcionarios f ON f.matricula = c.matricula
         `;
-        
+
         let params = [];
-        
+
         if (funcionarioMatricula) {
-            query += " WHERE c.matricula = ?";
+            query += ' WHERE c.matricula = ?';
             params.push(funcionarioMatricula);
         }
-        
-        query += ` ORDER BY c.data_inspecao DESC LIMIT ? OFFSET ?`;
+
+        query += ' ORDER BY c.data_inspecao DESC LIMIT ? OFFSET ?';
         params.push(limit, offset);
 
         return await conn.query(query, params);
     },
 
-    /**
-     * Buscar checklist por ID
-     */
     async findById(conn, id) {
         const query = `
             SELECT 
