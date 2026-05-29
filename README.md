@@ -7,7 +7,7 @@ Replaces paper checklists with a secure, mobile-ready digital pipeline — JWT-a
 
 ## Overview
 
-CarCheck v3.0 is a production-grade fleet management system built for **Angels Vigilância**, a Brazilian security operations company. It digitizes the full vehicle inspection workflow for field agents and provides administrators with a real-time audit dashboard, visual damage tracking, and personnel management — all secured by JWT authentication and Bcrypt password hashing.
+CarCheck v3.0 is a production-grade fleet management system built for a Brazilian security operations company. It digitizes the full vehicle inspection workflow for field agents and provides administrators with a real-time audit dashboard, visual damage tracking, and personnel management — all secured by JWT authentication and Bcrypt password hashing.
 
 Built to run on low-end smartphones in the field without requiring any app installation.
 
