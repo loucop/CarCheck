@@ -3,7 +3,7 @@ const veiculoRepository = {
         const query = `
             SELECT id, placa, modelo, status, km_atual 
             FROM veiculos 
-            WHERE status = 'ativo' 
+            WHERE status IN ('disponivel', 'em_uso')
             ORDER BY modelo
         `;
         return await conn.query(query);
@@ -29,6 +29,15 @@ const veiculoRepository = {
         `;
         const rows = await conn.query(query, [id]);
         return rows[0] || null;
+    },
+
+    async updateStatus(conn, veiculoId, status) {
+        const query = `
+            UPDATE veiculos
+            SET status = ?
+            WHERE id = ?
+        `;
+        return await conn.query(query, [status, veiculoId]);
     },
 
     async updateKm(conn, veiculoId, novoKm) {

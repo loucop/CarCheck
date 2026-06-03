@@ -3,6 +3,7 @@ const authController = require('../controllers/auth.controller');
 const veiculoController = require('../controllers/veiculo.controller');
 const checklistController = require('../controllers/checklist.controller');
 const adminController = require('../controllers/admin.controller');
+const bdvController = require('../controllers/bdv.controller');
 
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { validate, schemas } = require('../middlewares/validate.middleware');
@@ -65,6 +66,68 @@ router.post(
 );
 
 // ==========================================
+// ROTAS DE BDV (Autenticadas)
+// ==========================================
+
+/**
+ * POST /api/bdv
+ * Abrir novo BDV
+ */
+router.post(
+    '/bdv',
+    authenticate,
+    validate(schemas.openBDV),
+    bdvController.open
+);
+
+/**
+ * GET /api/bdv/:id
+ * Buscar BDV completo com paradas
+ */
+router.get(
+    '/bdv/:id',
+    authenticate,
+    validate(schemas.bdvParams, 'params'),
+    bdvController.findById
+);
+
+/**
+ * POST /api/bdv/:id/paradas
+ * Registrar parada em um BDV aberto
+ */
+router.post(
+    '/bdv/:id/paradas',
+    authenticate,
+    validate(schemas.bdvParams, 'params'),
+    validate(schemas.addParada),
+    bdvController.addParada
+);
+
+/**
+ * PATCH /api/bdv/:id/paradas/:paradaId
+ * Registrar chegada em uma parada
+ */
+router.patch(
+    '/bdv/:id/paradas/:paradaId',
+    authenticate,
+    validate(schemas.paradaParams, 'params'),
+    validate(schemas.closeParada),
+    bdvController.closeParada
+);
+
+/**
+ * PATCH /api/bdv/:id/encerrar
+ * Encerrar BDV
+ */
+router.patch(
+    '/bdv/:id/encerrar',
+    authenticate,
+    validate(schemas.bdvParams, 'params'),
+    validate(schemas.closeBDV),
+    bdvController.close
+);
+
+// ==========================================
 // ROTAS ADMINISTRATIVAS (Apenas Admin)
 // ==========================================
 
@@ -101,6 +164,18 @@ router.post(
     authorize(ROLES.ADMIN),
     validate(schemas.createFuncionario),
     authController.createFuncionario
+);
+
+/**
+ * GET /api/admin/bdv
+ * Relatório de BDVs com filtros
+ */
+router.get(
+    '/admin/bdv',
+    authenticate,
+    authorize(ROLES.ADMIN),
+    validate(schemas.relatorioBDV, 'query'),
+    bdvController.relatorio
 );
 
 // ==========================================
