@@ -4,3 +4,4 @@ backend/public/uploads/
 .DS_Store
 Thumbs.db
 *.log
+CLAUDE.md
