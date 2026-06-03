@@ -6,7 +6,7 @@ Real-time fleet inspection and trip log system for operational security teams.
 
 ## Overview
 
-CarCheck digitizes vehicle inspection workflows and daily trip logs (BDV) for field agents at Angels Vigilância. Administrators get a real-time audit dashboard with inspection history, damage maps, and trip reports. Built to run on low-end smartphones without app installation.
+CarCheck digitizes vehicle inspection workflows and daily trip logs (BDV) for operational fleet management. Administrators get a real-time audit dashboard with inspection history, damage maps, and trip reports. Built to run on low-end smartphones without app installation.
 
 ---
 
@@ -19,6 +19,17 @@ CarCheck digitizes vehicle inspection workflows and daily trip logs (BDV) for fi
 | Database   | MariaDB                           |
 | Auth       | JWT + Bcrypt                      |
 | Validation | Zod                               |
+
+---
+
+## Features
+
+- Vehicle inspection checklists
+- Digital damage mapping using HTML5 Canvas
+- Daily trip log (BDV) management
+- Stop registration and tracking
+- JWT authentication and role-based access control
+- Employee management
 
 ---
 
