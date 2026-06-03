@@ -192,6 +192,26 @@ const bdvService = {
         }
     },
 
+    async getBDVAtivo(conn, matricula) {
+        const ativo = await bdvRepository.findActiveBDVByMatricula(conn, matricula);
+
+        if (!ativo) {
+            throw {
+                message: 'Nenhum BDV aberto para este motorista',
+                code: ERROR_CODES.RESOURCE_NOT_FOUND,
+                statusCode: 404
+            };
+        }
+
+        const bdv = await bdvRepository.findBDVById(conn, ativo.id);
+
+        return {
+            ...bdv,
+            id: String(bdv.id),
+            veiculo_id: String(bdv.veiculo_id)
+        };
+    },
+
     async getBDV(conn, id) {
         const bdv = await bdvRepository.findBDVById(conn, id);
 

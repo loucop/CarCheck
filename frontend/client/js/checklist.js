@@ -246,7 +246,7 @@ async function finalizarRelatorio(event) {
 
     if (resposta.ok) {
       alert("✅ Checklist registrado com sucesso!");
-      window.location.href = "menu.html";
+      window.location.href = "bdv.html";
     } else {
       console.error('[ERRO] Detalhes:', resultado);
       alert(`❌ Erro: ${resultado.error || JSON.stringify(resultado)}`);

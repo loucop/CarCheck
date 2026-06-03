@@ -208,5 +208,26 @@
     <script src="../js/config.js"></script>
     <script src="../js/pdf-engine.js"></script>
     <script src="../js/checklist.js"></script>
+    <script>
+      // Guard: redirect to bdv.html if driver has an open BDV
+      (function () {
+        const _init = window.onload;
+        window.onload = async function () {
+          const token = localStorage.getItem("token");
+          if (token) {
+            try {
+              const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
+                headers: { "Authorization": `Bearer ${token}` }
+              });
+              if (res.ok) {
+                window.location.href = "bdv.html";
+                return;
+              }
+            } catch (e) { /* network error — proceed normally */ }
+          }
+          if (_init) _init();
+        };
+      })();
+    </script>
   </body>
 </html>

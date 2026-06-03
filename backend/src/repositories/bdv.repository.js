@@ -23,28 +23,28 @@ const bdvRepository = {
 
     async createBDV(conn, data) {
         const query = `
-            INSERT INTO bdv (matricula, veiculo_id, coligada, km_inicial, combustivel_saida, data_abertura, status)
-            VALUES (?, ?, ?, ?, ?, NOW(), 'aberto')
+            INSERT INTO bdv (matricula, veiculo_id, coligada, km_inicial, data_abertura, status)
+            VALUES (?, ?, ?, ?, NOW(), 'aberto')
         `;
         const result = await conn.query(query, [
             data.matricula,
             data.veiculo_id,
             data.coligada,
-            data.km_inicial,
-            data.combustivel_saida
+            data.km_inicial
         ]);
         return result.insertId;
     },
 
     async addParada(conn, bdv_id, data) {
         const query = `
-            INSERT INTO bdv_paradas (bdv_id, local_saida, hora_saida, local_chegada, observacao)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO bdv_paradas (bdv_id, local_saida, hora_saida, km, local_chegada, observacao)
+            VALUES (?, ?, ?, ?, ?, ?)
         `;
         const result = await conn.query(query, [
             bdv_id,
             data.local_saida,
             data.hora_saida,
+            data.km ?? null,
             data.local_chegada ?? null,
             data.observacao ?? null
         ]);
@@ -89,7 +89,7 @@ const bdvRepository = {
     },
 
     async findBDVById(conn, id) {
-        const query = `
+        const bdvQuery = `
             SELECT
                 b.id,
                 b.matricula,
@@ -97,7 +97,6 @@ const bdvRepository = {
                 b.coligada,
                 b.km_inicial,
                 b.km_final,
-                b.combustivel_saida,
                 b.combustivel_retorno,
                 b.status,
                 b.data_abertura,
@@ -105,37 +104,27 @@ const bdvRepository = {
                 b.encerrado_fora_base,
                 f.nome  AS motorista,
                 v.placa,
-                v.modelo,
-                JSON_ARRAYAGG(
-                    CASE WHEN p.id IS NOT NULL THEN
-                        JSON_OBJECT(
-                            'id',            p.id,
-                            'local_saida',   p.local_saida,
-                            'hora_saida',    p.hora_saida,
-                            'local_chegada', p.local_chegada,
-                            'hora_chegada',  p.hora_chegada,
-                            'km',            p.km,
-                            'observacao',    p.observacao
-                        )
-                    ELSE NULL END
-                ) AS paradas
+                v.modelo
             FROM bdv b
             LEFT JOIN funcionarios  f ON f.matricula = b.matricula
             LEFT JOIN veiculos      v ON v.id        = b.veiculo_id
-            LEFT JOIN bdv_paradas   p ON p.bdv_id    = b.id
             WHERE b.id = ?
-            GROUP BY b.id
+            LIMIT 1
         `;
-        const rows = await conn.query(query, [id]);
-        if (!rows[0]) return null;
 
-        const row = rows[0];
-        if (typeof row.paradas === 'string') {
-            row.paradas = JSON.parse(row.paradas);
-        }
-        // Filter the null sentinel produced by LEFT JOIN with no paradas
-        row.paradas = (row.paradas || []).filter(Boolean);
-        return row;
+        const paradasQuery = `
+            SELECT id, local_saida, hora_saida, local_chegada, hora_chegada, km, observacao
+            FROM bdv_paradas
+            WHERE bdv_id = ?
+            ORDER BY id ASC
+        `;
+
+        const bdvRows = await conn.query(bdvQuery, [id]);
+        if (!bdvRows[0]) return null;
+
+        const paradas = await conn.query(paradasQuery, [id]);
+
+        return { ...bdvRows[0], paradas };
     },
 
     async findAllBDV(conn, filters = {}) {
@@ -147,7 +136,6 @@ const bdvRepository = {
                 b.coligada,
                 b.km_inicial,
                 b.km_final,
-                b.combustivel_saida,
                 b.combustivel_retorno,
                 b.status,
                 b.data_abertura,

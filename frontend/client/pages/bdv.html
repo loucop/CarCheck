@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BDV - Boletim Diário de Veículo</title>
+    <link rel="stylesheet" href="../css/style.css" />
+    <style>
+      .veiculo-badge {
+        background: #0f172a;
+        border-left: 4px solid #3b82f6;
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 24px;
+      }
+      .veiculo-badge .placa {
+        font-size: 1.4rem;
+        font-weight: bold;
+        color: #f8fafc;
+        letter-spacing: 2px;
+      }
+      .veiculo-badge .modelo {
+        font-size: 0.9rem;
+        color: #94a3b8;
+        margin-top: 2px;
+      }
+
+      .bdv-info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .bdv-info-item {
+        background: #0f172a;
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      .bdv-info-item .label {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .bdv-info-item .value {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #f8fafc;
+        margin-top: 4px;
+      }
+
+      .parada-card {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 14px;
+        margin-bottom: 10px;
+      }
+      .parada-rota {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1rem;
+        font-weight: bold;
+        color: #f8fafc;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+      }
+      .parada-rota .seta {
+        color: #3b82f6;
+      }
+      .parada-rota .em-andamento {
+        color: #f59e0b;
+        font-style: italic;
+        font-weight: normal;
+      }
+      .parada-meta {
+        font-size: 0.82rem;
+        color: #94a3b8;
+        margin-bottom: 10px;
+      }
+
+      .btn-green {
+        background: #10b981;
+        width: 100%;
+        padding: 20px;
+        font-size: 1.15rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+      }
+      .btn-green:hover { background: #059669; }
+
+      .btn-blue {
+        background: #3b82f6;
+        width: 100%;
+        padding: 20px;
+        font-size: 1.15rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+      }
+      .btn-blue:hover { background: #2563eb; }
+
+      .btn-red {
+        background: #ef4444;
+        width: 100%;
+        padding: 20px;
+        font-size: 1.15rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+      }
+      .btn-red:hover { background: #dc2626; }
+
+      .btn-secondary {
+        background: #475569;
+        width: 100%;
+        padding: 14px;
+        font-size: 1rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      .btn-secondary:hover { background: #334155; }
+
+      .btn-sm-chegada {
+        background: #f59e0b;
+        padding: 10px 16px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 6px;
+      }
+      .btn-sm-chegada:hover { background: #d97706; }
+
+      .section-title {
+        font-size: 1rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 20px 0 12px;
+        border-bottom: 1px solid #334155;
+        padding-bottom: 8px;
+      }
+
+      .estado-loading {
+        text-align: center;
+        padding: 40px 0;
+        color: #94a3b8;
+      }
+
+      .badge-aberto {
+        display: inline-block;
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid #10b981;
+        border-radius: 20px;
+        padding: 4px 14px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        letter-spacing: 1px;
+        margin-bottom: 16px;
+      }
+
+      .sem-paradas {
+        text-align: center;
+        padding: 20px;
+        color: #475569;
+        font-style: italic;
+        border: 1px dashed #334155;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      }
+
+      .modal-inner {
+        width: 100%;
+        max-width: 500px;
+        margin: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" style="max-width: 600px; margin: 20px auto;">
+
+      <!-- Header -->
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+        <button onclick="voltar()" style="
+          background: #475569;
+          width: auto;
+          padding: 10px 18px;
+          font-size: 0.9rem;
+          border-radius: 6px;
+          white-space: nowrap;
+        ">← Menu</button>
+        <h2 style="margin: 0; font-size: 1.3rem;">Boletim de Viagem</h2>
+      </div>
+
+      <!-- Vehicle badge (always visible) -->
+      <div class="veiculo-badge" id="veiculo-badge">
+        <div class="placa" id="placa-display">—</div>
+        <div class="modelo" id="modelo-display">Carregando...</div>
+      </div>
+
+      <!-- STATE: Loading -->
+      <div id="estado-loading" class="estado-loading">
+        <p>Verificando viagem ativa...</p>
+      </div>
+
+      <!-- STATE 1: Abrir BDV -->
+      <div id="estado-abrir" style="display: none;">
+        <h3 style="margin-bottom: 20px; color: #f8fafc;">Nova Viagem</h3>
+
+        <div class="input-group">
+          <label for="km-inicial">KM Inicial *</label>
+          <input
+            type="number"
+            id="km-inicial"
+            placeholder="Ex: 142500"
+            min="0"
+            style="font-size: 1.4rem; padding: 16px; font-weight: bold; text-align: center;"
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="coligada">Coligada *</label>
+          <select id="coligada" style="font-size: 1.1rem; padding: 14px;">
+            <option value="">Selecione...</option>
+            <option value="angels">Angels</option>
+            <option value="cemax">Cemax</option>
+          </select>
+        </div>
+
+        <button class="btn-green" onclick="iniciarViagem()" style="margin-top: 10px;">
+          ▶ INICIAR VIAGEM
+        </button>
+      </div>
+
+      <!-- STATE 2: BDV em Andamento -->
+      <div id="estado-andamento" style="display: none;">
+        <span class="badge-aberto">● VIAGEM EM ANDAMENTO</span>
+
+        <div class="bdv-info-grid">
+          <div class="bdv-info-item">
+            <div class="label">KM Inicial</div>
+            <div class="value" id="bdv-km-inicial">—</div>
+          </div>
+          <div class="bdv-info-item">
+            <div class="label">Coligada</div>
+            <div class="value" id="bdv-coligada" style="text-transform: uppercase;">—</div>
+          </div>
+          <div class="bdv-info-item">
+            <div class="label">Início</div>
+            <div class="value" id="bdv-abertura" style="font-size: 0.95rem;">—</div>
+          </div>
+          <div class="bdv-info-item">
+            <div class="label">Paradas</div>
+            <div class="value" id="bdv-total-paradas">0</div>
+          </div>
+        </div>
+
+        <p class="section-title">Paradas Registradas</p>
+        <div id="lista-paradas">
+          <div class="sem-paradas">Nenhuma parada registrada.</div>
+        </div>
+
+        <button class="btn-blue" onclick="mostrarModalParada()">
+          + REGISTRAR PARADA
+        </button>
+        <button class="btn-red" onclick="mostrarModalEncerrar()">
+          ■ ENCERRAR VIAGEM
+        </button>
+      </div>
+
+    </div>
+
+    <!-- MODAL: Registrar Parada -->
+    <div id="modal-parada" class="modal">
+      <div class="card modal-inner">
+        <h3 style="margin-bottom: 20px; color: #3b82f6;">Registrar Parada</h3>
+
+        <div class="input-group">
+          <label for="local-saida">Local de Saída *</label>
+          <input type="text" id="local-saida" placeholder="Ex: Base Central" />
+        </div>
+
+        <div class="input-group">
+          <label for="hora-saida">Hora de Saída *</label>
+          <input type="datetime-local" id="hora-saida" />
+        </div>
+
+        <div class="input-group">
+          <label for="km-parada">KM *</label>
+          <input type="number" id="km-parada" placeholder="KM atual" min="0"
+            style="font-size: 1.2rem; padding: 14px; font-weight: bold; text-align: center;" />
+        </div>
+
+        <div class="input-group">
+          <label for="local-chegada-parada">Local de Chegada</label>
+          <input type="text" id="local-chegada-parada" placeholder="Opcional" />
+        </div>
+
+        <div class="input-group">
+          <label for="obs-parada">Observação</label>
+          <input type="text" id="obs-parada" placeholder="Opcional" />
+        </div>
+
+        <button onclick="salvarParada()" class="btn-blue" style="margin-bottom: 0;">
+          SALVAR PARADA
+        </button>
+        <button class="btn-secondary" onclick="fecharModalParada()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- MODAL: Registrar Chegada (fechar parada existente) -->
+    <div id="modal-chegada" class="modal">
+      <div class="card modal-inner">
+        <h3 style="margin-bottom: 20px; color: #f59e0b;">Registrar Chegada</h3>
+
+        <div class="input-group">
+          <label for="chegada-local">Local de Chegada *</label>
+          <input type="text" id="chegada-local" placeholder="Ex: Posto Alpha" />
+        </div>
+
+        <div class="input-group">
+          <label for="chegada-hora">Hora de Chegada *</label>
+          <input type="datetime-local" id="chegada-hora" />
+        </div>
+
+        <div class="input-group">
+          <label for="chegada-km">KM na Chegada</label>
+          <input type="number" id="chegada-km" placeholder="Opcional" min="0" />
+        </div>
+
+        <div class="input-group">
+          <label for="chegada-obs">Observação</label>
+          <input type="text" id="chegada-obs" placeholder="Opcional" />
+        </div>
+
+        <button onclick="salvarChegada()" style="
+          background: #f59e0b;
+          width: 100%;
+          padding: 18px;
+          font-size: 1.1rem;
+          font-weight: bold;
+          border: none;
+          border-radius: 8px;
+          color: white;
+          cursor: pointer;
+          margin-bottom: 0;
+        ">CONFIRMAR CHEGADA</button>
+        <button class="btn-secondary" onclick="fecharModalChegada()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- MODAL: Encerrar Viagem -->
+    <div id="modal-encerrar" class="modal">
+      <div class="card modal-inner">
+        <h3 style="margin-bottom: 20px; color: #ef4444;">Encerrar Viagem</h3>
+
+        <div class="input-group">
+          <label for="km-final">KM Final *</label>
+          <input
+            type="number"
+            id="km-final"
+            placeholder="—"
+            min="0"
+            style="font-size: 1.3rem; padding: 16px; font-weight: bold; text-align: center;"
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="combustivel-retorno">Combustível de Retorno *</label>
+          <select id="combustivel-retorno" style="font-size: 1.1rem; padding: 14px;">
+            <option value="">Selecione...</option>
+            <option value="1/8">1/8</option>
+            <option value="2/8">2/8</option>
+            <option value="3/8">3/8</option>
+            <option value="4/8">4/8</option>
+            <option value="5/8">5/8</option>
+            <option value="6/8">6/8</option>
+            <option value="7/8">7/8</option>
+            <option value="8/8">8/8</option>
+          </select>
+        </div>
+
+        <div class="input-group" style="display: flex; align-items: center; gap: 12px;">
+          <input
+            type="checkbox"
+            id="fora-base"
+            style="width: 24px; height: 24px; cursor: pointer; flex-shrink: 0;"
+          />
+          <label for="fora-base" style="margin: 0; font-size: 1rem; color: #f8fafc; cursor: pointer;">
+            Encerrado fora da base
+          </label>
+        </div>
+
+        <button class="btn-red" onclick="encerrarViagem()" style="margin-top: 10px;">
+          ■ CONFIRMAR ENCERRAMENTO
+        </button>
+        <button class="btn-secondary" onclick="fecharModalEncerrar()">Cancelar</button>
+      </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+      let bdvAtivo = null;
+      let paradaEmFechamento = null;
+
+      // ─── Auth + Init ───────────────────────────────────────────────
+      document.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('token');
+        const usuario = localStorage.getItem('usuario');
+        if (!token || !usuario) {
+          window.location.href = 'login.html';
+          return;
+        }
+
+        const veiculoId = localStorage.getItem('veiculo_id');
+        const placa     = localStorage.getItem('veiculo_atual') || '—';
+        const modelo    = localStorage.getItem('modelo_veiculo') || placa;
+
+        document.getElementById('placa-display').textContent  = placa;
+        document.getElementById('modelo-display').textContent = modelo;
+
+        if (!veiculoId) {
+          alert('Selecione um veículo antes de iniciar uma viagem.');
+          window.location.href = 'selecao.html';
+          return;
+        }
+
+        verificarBDVAtivo();
+      });
+
+      function voltar() {
+        window.location.href = 'menu.html';
+      }
+
+      // ─── State management ──────────────────────────────────────────
+      function mostrarEstado(estado) {
+        document.getElementById('estado-loading').style.display   = 'none';
+        document.getElementById('estado-abrir').style.display     = 'none';
+        document.getElementById('estado-andamento').style.display = 'none';
+        if (estado === 'loading')    document.getElementById('estado-loading').style.display   = 'block';
+        if (estado === 'abrir')      document.getElementById('estado-abrir').style.display     = 'block';
+        if (estado === 'andamento')  document.getElementById('estado-andamento').style.display = 'block';
+      }
+
+      // ─── API: verificar BDV ativo ──────────────────────────────────
+      async function verificarBDVAtivo() {
+        mostrarEstado('loading');
+        const token = localStorage.getItem('token');
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (res.status === 401) {
+            localStorage.clear();
+            window.location.href = 'login.html';
+            return;
+          }
+
+          if (res.status === 404) {
+            mostrarEstado('abrir');
+            return;
+          }
+
+          if (res.ok) {
+            const json = await res.json();
+            bdvAtivo = json.data;
+            preencherAndamento();
+            mostrarEstado('andamento');
+            return;
+          }
+
+          mostrarEstado('abrir');
+        } catch (err) {
+          console.error('[BDV] Erro ao verificar BDV ativo:', err);
+          mostrarEstado('abrir');
+        }
+      }
+
+      // ─── State 2: preencher dados do BDV ──────────────────────────
+      function preencherAndamento() {
+        if (!bdvAtivo) return;
+        document.getElementById('bdv-km-inicial').textContent    = bdvAtivo.km_inicial ?? '—';
+        document.getElementById('bdv-coligada').textContent      = bdvAtivo.coligada   ?? '—';
+        document.getElementById('bdv-abertura').textContent      = formatarData(bdvAtivo.data_abertura);
+        document.getElementById('bdv-total-paradas').textContent = (bdvAtivo.paradas || []).length;
+        renderizarParadas(bdvAtivo.paradas || []);
+      }
+
+      function renderizarParadas(paradas) {
+        const container = document.getElementById('lista-paradas');
+        if (!paradas.length) {
+          container.innerHTML = '<div class="sem-paradas">Nenhuma parada registrada.</div>';
+          return;
+        }
+        container.innerHTML = paradas.map(p => `
+          <div class="parada-card">
+            <div class="parada-rota">
+              <span>${escHtml(p.local_saida)}</span>
+              <span class="seta">→</span>
+              ${p.local_chegada
+                ? `<span>${escHtml(p.local_chegada)}</span>`
+                : `<span class="em-andamento">Em andamento</span>`}
+            </div>
+            <div class="parada-meta">
+              Saída: ${formatarData(p.hora_saida)}
+              ${p.hora_chegada ? ` &nbsp;|&nbsp; Chegada: ${formatarData(p.hora_chegada)}` : ''}
+              ${p.km ? ` &nbsp;|&nbsp; KM: ${p.km}` : ''}
+              ${p.observacao ? `<br>${escHtml(p.observacao)}` : ''}
+            </div>
+            ${!p.hora_chegada ? `
+              <button class="btn-sm-chegada" onclick="mostrarModalChegada(${p.id})">
+                Registrar Chegada
+              </button>` : ''}
+          </div>
+        `).join('');
+      }
+
+      // ─── API: Abrir BDV ────────────────────────────────────────────
+      async function iniciarViagem() {
+        const kmInicial  = document.getElementById('km-inicial').value.trim();
+        const coligada   = document.getElementById('coligada').value;
+        const veiculoId  = parseInt(localStorage.getItem('veiculo_id'));
+
+        if (isNaN(veiculoId)) {
+          alert('Selecione um veículo antes de iniciar a viagem.');
+          window.location.href = 'selecao.html';
+          return;
+        }
+        if (!kmInicial) { alert('Informe o KM inicial.'); return; }
+        if (!coligada)  { alert('Selecione a coligada.'); return; }
+
+        const token = localStorage.getItem('token');
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              veiculo_id: veiculoId,
+              coligada,
+              km_inicial: parseInt(kmInicial)
+            })
+          });
+
+          const json = await res.json();
+          if (res.status === 401) {
+            localStorage.clear();
+            window.location.href = 'login.html';
+            return;
+          }
+          if (!res.ok) {
+            alert(`Erro: ${json.error || 'Não foi possível iniciar a viagem.'}`);
+            return;
+          }
+
+          bdvAtivo = {
+            id:           String(json.data.id),
+            veiculo_id:   String(json.data.veiculo_id),
+            km_inicial:   json.data.km_inicial,
+            coligada:     coligada,
+            data_abertura: new Date().toISOString(),
+            paradas:      []
+          };
+          preencherAndamento();
+          mostrarEstado('andamento');
+        } catch (err) {
+          console.error('[BDV] Erro ao iniciar viagem:', err);
+          alert('Erro de comunicação com o servidor.');
+        }
+      }
+
+      // ─── Modal: Registrar Parada ───────────────────────────────────
+      function mostrarModalParada() {
+        const paradas  = bdvAtivo?.paradas || [];
+        const ultima   = paradas.length ? paradas[paradas.length - 1] : null;
+
+        document.getElementById('hora-saida').value           = agora();
+        document.getElementById('km-parada').value            = '';
+        document.getElementById('local-saida').value          = ultima?.local_chegada || '';
+        document.getElementById('local-chegada-parada').value = '';
+        document.getElementById('obs-parada').value           = '';
+        abrirModal('modal-parada');
+      }
+      function fecharModalParada() { fecharModal('modal-parada'); }
+
+      async function salvarParada() {
+        const localSaida   = document.getElementById('local-saida').value.trim();
+        const horaSaida    = document.getElementById('hora-saida').value;
+        const km           = document.getElementById('km-parada').value.trim();
+        const localChegada = document.getElementById('local-chegada-parada').value.trim();
+        const observacao   = document.getElementById('obs-parada').value.trim();
+
+        if (!localSaida) { alert('Informe o local de saída.'); return; }
+        if (!horaSaida)  { alert('Informe a hora de saída.'); return; }
+        if (!km)         { alert('Informe o KM atual.'); return; }
+
+        const token = localStorage.getItem('token');
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvAtivo.id}/paradas`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              local_saida:   localSaida,
+              hora_saida:    horaSaida,
+              km:            parseInt(km),
+              local_chegada: localChegada || null,
+              observacao:    observacao   || null
+            })
+          });
+
+          const json = await res.json();
+          if (!res.ok) {
+            alert(`Erro: ${json.error || 'Não foi possível registrar a parada.'}`);
+            return;
+          }
+
+          fecharModalParada();
+          await recarregarBDV();
+        } catch (err) {
+          console.error('[BDV] Erro ao salvar parada:', err);
+          alert('Erro de comunicação com o servidor.');
+        }
+      }
+
+      // ─── Modal: Registrar Chegada ──────────────────────────────────
+      function mostrarModalChegada(paradaId) {
+        paradaEmFechamento = paradaId;
+        document.getElementById('chegada-hora').value = agora();
+        document.getElementById('chegada-local').value = '';
+        document.getElementById('chegada-km').value    = '';
+        document.getElementById('chegada-obs').value   = '';
+        abrirModal('modal-chegada');
+      }
+      function fecharModalChegada() {
+        paradaEmFechamento = null;
+        fecharModal('modal-chegada');
+      }
+
+      async function salvarChegada() {
+        const localChegada = document.getElementById('chegada-local').value.trim();
+        const horaChegada  = document.getElementById('chegada-hora').value;
+        const km           = document.getElementById('chegada-km').value;
+        const observacao   = document.getElementById('chegada-obs').value.trim();
+
+        if (!localChegada) { alert('Informe o local de chegada.'); return; }
+        if (!horaChegada)  { alert('Informe a hora de chegada.'); return; }
+
+        const token = localStorage.getItem('token');
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvAtivo.id}/paradas/${paradaEmFechamento}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              local_chegada: localChegada,
+              hora_chegada:  horaChegada,
+              km:            km ? parseInt(km) : null,
+              observacao:    observacao || null
+            })
+          });
+
+          const json = await res.json();
+          if (!res.ok) {
+            alert(`Erro: ${json.error || 'Não foi possível registrar a chegada.'}`);
+            return;
+          }
+
+          fecharModalChegada();
+          await recarregarBDV();
+        } catch (err) {
+          console.error('[BDV] Erro ao registrar chegada:', err);
+          alert('Erro de comunicação com o servidor.');
+        }
+      }
+
+      // ─── Modal: Encerrar Viagem ────────────────────────────────────
+      function mostrarModalEncerrar() {
+        const kmAtual = bdvAtivo?.km_inicial ?? '';
+        document.getElementById('km-final').value            = '';
+        document.getElementById('km-final').placeholder      = kmAtual ? `>= ${kmAtual}` : '—';
+        document.getElementById('combustivel-retorno').value = '';
+        document.getElementById('fora-base').checked         = false;
+        abrirModal('modal-encerrar');
+      }
+      function fecharModalEncerrar() { fecharModal('modal-encerrar'); }
+
+      async function encerrarViagem() {
+        const kmFinal      = document.getElementById('km-final').value.trim();
+        const combustivel  = document.getElementById('combustivel-retorno').value.trim();
+        const foraBase     = document.getElementById('fora-base').checked;
+
+        if (!kmFinal)     { alert('Informe o KM final.'); return; }
+        if (!combustivel) { alert('Informe o nível de combustível.'); return; }
+
+        if (!confirm('Confirmar encerramento da viagem?')) return;
+
+        const token = localStorage.getItem('token');
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvAtivo.id}/encerrar`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              km_final:            parseInt(kmFinal),
+              combustivel_retorno: combustivel,
+              encerrado_fora_base: foraBase
+            })
+          });
+
+          const json = await res.json();
+          if (!res.ok) {
+            alert(`Erro: ${json.error || 'Não foi possível encerrar a viagem.'}`);
+            return;
+          }
+
+          alert('Viagem encerrada com sucesso!');
+          bdvAtivo = null;
+          window.location.href = 'menu.html';
+        } catch (err) {
+          console.error('[BDV] Erro ao encerrar viagem:', err);
+          alert('Erro de comunicação com o servidor.');
+        }
+      }
+
+      // ─── Helpers ───────────────────────────────────────────────────
+      async function recarregarBDV() {
+        const token = localStorage.getItem('token');
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvAtivo.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const json = await res.json();
+            bdvAtivo = json.data;
+            preencherAndamento();
+          }
+        } catch (err) {
+          console.error('[BDV] Erro ao recarregar BDV:', err);
+        }
+      }
+
+      function abrirModal(id) {
+        const el = document.getElementById(id);
+        el.style.display = 'flex';
+      }
+      function fecharModal(id) {
+        document.getElementById(id).style.display = 'none';
+      }
+
+      function agora() {
+        const d = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+
+      function formatarData(str) {
+        if (!str) return '—';
+        const d = new Date(str);
+        if (isNaN(d)) return str;
+        return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      }
+
+      function escHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+    </script>
+  </body>
+</html>

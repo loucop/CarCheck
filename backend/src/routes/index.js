@@ -81,6 +81,16 @@ router.post(
 );
 
 /**
+ * GET /api/bdv/ativo
+ * BDV aberto do motorista autenticado
+ */
+router.get(
+    '/bdv/ativo',
+    authenticate,
+    bdvController.getAtivo
+);
+
+/**
  * GET /api/bdv/:id
  * Buscar BDV completo com paradas
  */

@@ -128,6 +128,17 @@
         </div>
 
         <div
+          id="card-bdv"
+          class="menu-card"
+          onclick="acessarSistema('bdv')"
+          style="display: none;"
+        >
+          <div class="icon">🚐</div>
+          <h3>Boletim de Viagem</h3>
+          <p>Abertura e encerramento de BDV, registro de paradas e KM.</p>
+        </div>
+
+        <div
           id="card-admin"
           class="menu-card"
           onclick="acessarSistema('admin')"
@@ -146,7 +157,7 @@
 
     <script>
       // LOGICA DE INICIALIZAÇÃO E SEGURANÇA v3.0
-      document.addEventListener("DOMContentLoaded", () => {
+      document.addEventListener("DOMContentLoaded", async () => {
           const dadosSessao = localStorage.getItem("usuario");
           const token = localStorage.getItem("token");
 
@@ -162,8 +173,10 @@
           // Atualização da Interface
           document.getElementById("nome-operador").innerText = usuario.nome.toUpperCase();
 
-          // Controle de Acesso: Mostra Admin apenas se nivel_acesso for 'admin'
+          // Controle de Acesso
           const adminCard = document.getElementById("card-admin");
+          const bdvCard   = document.getElementById("card-bdv");
+
           if (usuario.nivel_acesso === "admin") {
               adminCard.style.display = "flex";
               console.log("[AUTH] Privilégios administrativos concedidos.");
@@ -171,14 +184,31 @@
               adminCard.style.display = "none";
               console.log("[AUTH] Acesso de motorista padrão.");
           }
+
+          if (usuario.nivel_acesso === "motorista") {
+              bdvCard.style.display = "flex";
+
+              try {
+                  const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
+                      headers: { "Authorization": `Bearer ${token}` }
+                  });
+                  if (res.ok) {
+                      window.location.href = "bdv.html";
+                  }
+              } catch (e) {
+                  // network error — stay on menu
+              }
+          }
       });
 
       // NAVEGAÇÃO ENTRE MÓDULOS
       function acessarSistema(sistema) {
           if (sistema === "carcheck") {
-              window.location.href = "selecao.html"; 
+              window.location.href = "selecao.html";
           } else if (sistema === "admin") {
               window.location.href = "admin.html";
+          } else if (sistema === "bdv") {
+              window.location.href = "bdv.html";
           }
       }
 

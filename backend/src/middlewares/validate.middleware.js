@@ -73,13 +73,13 @@ const schemas = {
     openBDV: z.object({
         veiculo_id: z.coerce.number().int().positive('ID do veículo inválido'),
         coligada: z.enum(['angels', 'cemax']),
-        km_inicial: z.coerce.number().nonnegative('KM não pode ser negativo'),
-        combustivel_saida: z.string().min(1, 'Combustível de saída obrigatório')
+        km_inicial: z.coerce.number().nonnegative('KM não pode ser negativo')
     }),
 
     addParada: z.object({
         local_saida: z.string().min(1),
         hora_saida: z.string(),
+        km: z.coerce.number().nonnegative().optional().nullable(),
         local_chegada: z.string().optional().nullable(),
         observacao: z.string().optional().nullable()
     }),

@@ -27,6 +27,26 @@ const bdvController = {
     },
 
     /**
+     * GET /api/bdv/ativo
+     * Retorna o BDV aberto do motorista autenticado
+     */
+    async getAtivo(req, res, next) {
+        let conn;
+        try {
+            conn = await pool.getConnection();
+
+            const result = await bdvService.getBDVAtivo(conn, req.user.matricula);
+
+            return response.success(res, result);
+
+        } catch (err) {
+            return next(err);
+        } finally {
+            if (conn) conn.release();
+        }
+    },
+
+    /**
      * GET /api/bdv/:id
      * Retorna BDV completo com todas as paradas
      */
