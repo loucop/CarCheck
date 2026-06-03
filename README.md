@@ -161,7 +161,11 @@ PORT=3000
 
 ## License
 
-MIT License. Free to use, adapt, and distribute.
+This project is proprietary software.
+
+Copyright (c) 2026 Leonardo Andrade. All rights reserved.
+
+No permission is granted to use, copy, modify, distribute, sublicense, deploy for third parties, or create derivative works without explicit written authorization from the copyright holder.
 
 ---
 
