@@ -37,8 +37,8 @@ const funcionarioRepository = {
      */
     async findAll(conn) {
         const query = `
-            SELECT matricula, nome, cpf, nivel_acesso 
-            FROM funcionarios 
+            SELECT matricula, nome, cpf, nivel_acesso, coligada
+            FROM funcionarios
             ORDER BY nome
         `;
         return await conn.query(query);
@@ -49,15 +49,16 @@ const funcionarioRepository = {
      */
     async create(conn, data) {
         const query = `
-            INSERT INTO funcionarios (matricula, nome, cpf, senha, nivel_acesso) 
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO funcionarios (matricula, nome, cpf, senha, nivel_acesso, coligada)
+            VALUES (?, ?, ?, ?, ?, ?)
         `;
         await conn.query(query, [
             data.matricula,
             data.nome,
             data.cpf,
             data.senha_hash,
-            data.nivel_acesso
+            data.nivel_acesso,
+            data.coligada ?? null
         ]);
         return data;
     },

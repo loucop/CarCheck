@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarCheck - Gestão de Funcionários</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .admin-container {
+            padding: 20px;
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .btn-voltar {
+            background: #64748b;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn-voltar:hover { background: #475569; }
+
+        .btn-novo {
+            background: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn-novo:hover { background: #2563eb; }
+
+        .table-wrapper { overflow-x: auto; margin-top: 16px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            color: #000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            min-width: 560px;
+        }
+
+        th, td {
+            padding: 13px 14px;
+            border: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        th {
+            background-color: #1e293b;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        tr:nth-child(even) { background-color: #f9fafb; }
+        tr:hover { background-color: #f1f5f9; }
+
+        .sem-resultados {
+            text-align: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        .nivel-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .nivel-admin       { background: rgba(99,102,241,.15); color: #6366f1; border: 1px solid #818cf8; }
+        .nivel-vistoriador { background: rgba(245,158,11,.15); color: #b45309; border: 1px solid #fcd34d; }
+        .nivel-motorista   { background: rgba(16,185,129,.15); color: #059669; border: 1px solid #6ee7b7; }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 480px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            cursor: pointer;
+            font-size: 26px;
+            color: #64748b;
+            background: none;
+            border: none;
+            line-height: 1;
+        }
+
+        .modal-close:hover { color: #ef4444; }
+
+        .input-group { margin-bottom: 14px; }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #334155;
+            font-size: 0.9rem;
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1rem;
+            color: #1e293b;
+            background: white;
+            box-sizing: border-box;
+        }
+
+        .input-group select option {
+            background: white;
+            color: #1e293b;
+        }
+
+        .btn-salvar {
+            width: 100%;
+            padding: 12px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-top: 6px;
+            transition: background 0.2s;
+        }
+
+        .btn-salvar:hover { background: #059669; }
+
+        .btn-cancelar {
+            width: 100%;
+            padding: 10px;
+            background: #94a3b8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 8px;
+            transition: background 0.2s;
+        }
+
+        .btn-cancelar:hover { background: #64748b; }
+
+        @media (max-width: 600px) {
+            .admin-header h1 { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+
+        <div class="admin-header">
+            <div>
+                <h1 style="margin: 0; color: #1e293b;">Gestão de Funcionários</h1>
+                <p style="margin: 5px 0 0; color: #64748b;">Cadastro e gerenciamento de colaboradores</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-voltar" onclick="window.location.href='admin-dashboard.html'">
+                    &larr; Voltar ao Painel
+                </button>
+                <button class="btn-novo" onclick="abrirModal()">
+                    + Novo Funcionário
+                </button>
+            </div>
+        </div>
+
+        <div id="info-resultado" style="font-size:0.85rem; color:#64748b; margin-bottom:4px;"></div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Matrícula</th>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>Nível de Acesso</th>
+                        <th>Coligada</th>
+                    </tr>
+                </thead>
+                <tbody id="corpo-tabela">
+                    <tr>
+                        <td colspan="5" class="sem-resultados">Carregando...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- Modal: Novo Funcionário -->
+    <div id="modal-funcionario" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="fecharModal()">&times;</button>
+            <h2 style="margin: 0 0 20px; color: #1e293b;">Cadastrar Funcionário</h2>
+
+            <form id="form-funcionario" onsubmit="salvarFuncionario(event)">
+
+                <div class="input-group">
+                    <label for="cad_nome">Nome Completo *</label>
+                    <input type="text" id="cad_nome" placeholder="Ex: João Silva" required />
+                </div>
+
+                <div class="input-group">
+                    <label for="cad_cpf">CPF (apenas números) *</label>
+                    <input type="text" id="cad_cpf" maxlength="11" placeholder="12345678901" required />
+                </div>
+
+                <div class="input-group">
+                    <label for="cad_matricula">Matrícula *</label>
+                    <input type="text" id="cad_matricula" placeholder="Ex: 1042" required />
+                </div>
+
+                <div class="input-group">
+                    <label for="cad_senha">Senha *</label>
+                    <input type="password" id="cad_senha" placeholder="Mínimo 6 caracteres" required />
+                </div>
+
+                <div class="input-group">
+                    <label for="cad_cargo">Nível de Acesso *</label>
+                    <select id="cad_cargo" required onchange="toggleColigada()">
+                        <option value="">Selecione...</option>
+                        <option value="motorista">Motorista</option>
+                        <option value="vistoriador">Vistoriador</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+
+                <div class="input-group" id="grupo-coligada" style="display: none;">
+                    <label for="cad_coligada">Coligada *</label>
+                    <select id="cad_coligada">
+                        <option value="">Selecione...</option>
+                        <option value="angels">Angels</option>
+                        <option value="cemax">Cemax</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-salvar">Salvar Cadastro</button>
+                <button type="button" class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        // ─── Auth ──────────────────────────────────────────────────────
+        (function () {
+            const token   = localStorage.getItem('token');
+            const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
+            if (!token || !usuario || usuario.nivel_acesso !== 'admin') {
+                window.location.href = 'login.html';
+            }
+        })();
+
+        // ─── Load table ───────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', carregarFuncionarios);
+
+        async function carregarFuncionarios() {
+            const token = localStorage.getItem('token');
+            const corpo = document.getElementById('corpo-tabela');
+            corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Carregando...</td></tr>';
+
+            try {
+                const res = await fetch(`${CONFIG.API_BASE_URL}/admin/funcionarios`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.status === 401) {
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                if (!res.ok) {
+                    corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Erro ao carregar dados.</td></tr>';
+                    return;
+                }
+
+                const json = await res.json();
+                const lista = json.data || [];
+
+                document.getElementById('info-resultado').textContent =
+                    `${lista.length} funcionário(s) cadastrado(s)`;
+
+                if (!lista.length) {
+                    corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Nenhum funcionário cadastrado.</td></tr>';
+                    return;
+                }
+
+                corpo.innerHTML = lista.map(f => `
+                    <tr>
+                        <td><code>${escHtml(f.matricula)}</code></td>
+                        <td>${escHtml(f.nome)}</td>
+                        <td>${formatCPF(f.cpf)}</td>
+                        <td>${nivelBadge(f.nivel_acesso)}</td>
+                        <td>${f.coligada ? escHtml(f.coligada).toUpperCase() : '—'}</td>
+                    </tr>
+                `).join('');
+
+            } catch (err) {
+                corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Erro de comunicação com o servidor.</td></tr>';
+            }
+        }
+
+        // ─── Modal ────────────────────────────────────────────────────
+        function abrirModal() {
+            document.getElementById('form-funcionario').reset();
+            document.getElementById('grupo-coligada').style.display = 'none';
+            document.getElementById('modal-funcionario').style.display = 'flex';
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-funcionario').style.display = 'none';
+        }
+
+        function toggleColigada() {
+            const nivel = document.getElementById('cad_cargo').value;
+            const grupo = document.getElementById('grupo-coligada');
+            grupo.style.display = nivel === 'admin' || nivel === '' ? 'none' : 'block';
+            if (nivel === 'admin') {
+                document.getElementById('cad_coligada').value = '';
+            }
+        }
+
+        // ─── Submit ───────────────────────────────────────────────────
+        async function salvarFuncionario(e) {
+            e.preventDefault();
+
+            const nome        = document.getElementById('cad_nome').value.trim();
+            const cpf         = document.getElementById('cad_cpf').value.trim();
+            const matricula   = document.getElementById('cad_matricula').value.trim();
+            const senha       = document.getElementById('cad_senha').value;
+            const nivel_acesso = document.getElementById('cad_cargo').value;
+            const coligada    = document.getElementById('cad_coligada').value;
+
+            if (nome.length < 3)         { alert('Nome deve ter no mínimo 3 caracteres.'); return; }
+            if (!/^\d{11}$/.test(cpf))   { alert('CPF deve conter exatamente 11 dígitos numéricos.'); return; }
+            if (!matricula)              { alert('Informe a matrícula.'); return; }
+            if (senha.length < 6)        { alert('Senha deve ter no mínimo 6 caracteres.'); return; }
+            if (!nivel_acesso)           { alert('Selecione o nível de acesso.'); return; }
+            if (nivel_acesso !== 'admin' && !coligada) { alert('Selecione a coligada.'); return; }
+
+            const payload = { nome, cpf, matricula, senha, nivel_acesso };
+            if (nivel_acesso !== 'admin') payload.coligada = coligada;
+
+            const token = localStorage.getItem('token');
+            try {
+                const res = await fetch(`${CONFIG.API_BASE_URL}/admin/funcionarios`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.status === 401) {
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const json = await res.json();
+
+                if (!res.ok) {
+                    alert(`Erro: ${json.error || 'Não foi possível cadastrar o funcionário.'}`);
+                    return;
+                }
+
+                fecharModal();
+                await carregarFuncionarios();
+
+            } catch (err) {
+                alert('Erro de comunicação com o servidor.');
+            }
+        }
+
+        // ─── Helpers ──────────────────────────────────────────────────
+        function nivelBadge(nivel) {
+            const map = {
+                admin:       ['nivel-badge nivel-admin',       'Admin'],
+                vistoriador: ['nivel-badge nivel-vistoriador', 'Vistoriador'],
+                motorista:   ['nivel-badge nivel-motorista',   'Motorista']
+            };
+            const [cls, label] = map[nivel] || ['nivel-badge', nivel];
+            return `<span class="${cls}">${label}</span>`;
+        }
+
+        function formatCPF(cpf) {
+            if (!cpf || cpf.length !== 11) return cpf || '—';
+            return `${cpf.slice(0,3)}.${cpf.slice(3,6)}.${cpf.slice(6,9)}-${cpf.slice(9)}`;
+        }
+
+        function escHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+    </script>
+</body>
+</html>

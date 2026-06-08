@@ -128,17 +128,6 @@
         </div>
 
         <div
-          id="card-bdv"
-          class="menu-card"
-          onclick="acessarSistema('bdv')"
-          style="display: none;"
-        >
-          <div class="icon">🚐</div>
-          <h3>Boletim de Viagem</h3>
-          <p>Abertura e encerramento de BDV, registro de paradas e KM.</p>
-        </div>
-
-        <div
           id="card-admin"
           class="menu-card"
           onclick="acessarSistema('admin')"
@@ -175,19 +164,14 @@
 
           // Controle de Acesso
           const adminCard = document.getElementById("card-admin");
-          const bdvCard   = document.getElementById("card-bdv");
 
           if (usuario.nivel_acesso === "admin") {
               adminCard.style.display = "flex";
-              console.log("[AUTH] Privilégios administrativos concedidos.");
           } else {
               adminCard.style.display = "none";
-              console.log("[AUTH] Acesso de motorista padrão.");
           }
 
           if (usuario.nivel_acesso === "motorista") {
-              bdvCard.style.display = "flex";
-
               try {
                   const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
                       headers: { "Authorization": `Bearer ${token}` }
@@ -207,8 +191,6 @@
               window.location.href = "selecao.html";
           } else if (sistema === "admin") {
               window.location.href = "admin-dashboard.html";
-          } else if (sistema === "bdv") {
-              window.location.href = "bdv.html";
           }
       }
 

@@ -110,21 +110,6 @@
             background: #059669;
         }
         
-        .btn-novo-func {
-            background: #3b82f6;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
-        }
-
-        .btn-novo-func:hover {
-            background: #2563eb;
-        }
-
         .btn-bdv {
             background: #6366f1;
             color: white;
@@ -229,9 +214,6 @@
             <button class="btn-refresh" onclick="carregarRelatorios(filtroAtivo)">
                 Atualizar Dados
             </button>
-            <button class="btn-novo-func" onclick="abrirModalFuncionario()">
-                + Novo Funcionário
-            </button>
             <button class="btn-bdv" onclick="window.location.href='admin-bdv.html'">
                 Relatório de Viagens (BDV)
             </button>
@@ -251,54 +233,6 @@
                 <tr><td colspan="6" style="text-align:center; padding: 20px;">Carregando...</td></tr>
             </tbody>
         </table>
-    </div>
-
-    <!-- Modal: Cadastro de Funcionário -->
-    <div id="modalFuncionario" class="modal">
-        <div class="modal-content">
-            <button onclick="fecharModalFuncionario()" class="modal-close">&times;</button>
-            <h2 style="margin-top: 0; color: #1e293b;">Cadastrar Funcionário</h2>
-            
-            <form id="formFuncionario">
-                <div class="input-group">
-                    <label>Nome Completo:</label>
-                    <input type="text" id="cad_nome" placeholder="Ex: João Silva" required>
-                </div>
-                
-                <div class="input-group">
-                    <label>CPF (apenas números):</label>
-                    <input type="text" id="cad_cpf" maxlength="11" placeholder="12345678901" required>
-                </div>
-                
-                <div class="input-group">
-                    <label>Matrícula:</label>
-                    <input type="text" id="cad_id" placeholder="Matrícula do Funcionário" required>
-                </div>
-
-                <div class="input-group">
-                    <label>Senha de Acesso:</label>
-                    <input type="password" id="cad_senha" placeholder="Senha" required>
-                </div>
-
-                <div class="input-group">
-                    <label>Nível de Acesso:</label>
-                    <select id="cad_cargo" required>
-                        <option value="motorista">Motorista (Apenas Checklist)</option>
-                        <option value="vistoriador">Vistoriador (Checklist)</option>
-                        <option value="admin">Administrador (Acesso Total)</option>
-                    </select>
-                </div>
-
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="submit" style="flex: 2; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                        Salvar Cadastro
-                    </button>
-                    <button type="button" onclick="fecharModalFuncionario()" style="flex: 1; padding: 12px; background: #94a3b8; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                        Cancelar
-                    </button>
-                </div>
-            </form>
-        </div>
     </div>
 
     <!-- Modal: Detalhes do Checklist -->

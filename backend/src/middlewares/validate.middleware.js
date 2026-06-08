@@ -42,7 +42,8 @@ const schemas = {
         senha: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
         nivel_acesso: z.enum(['admin', 'vistoriador', 'motorista'], {
             errorMap: () => ({ message: "Nível de acesso deve ser 'admin', 'vistoriador' ou 'motorista'" })
-        })
+        }),
+        coligada: z.enum(['angels', 'cemax']).optional().nullable()
     }),
 
     // matricula usa coerce para aceitar número ou string (ex: matricula = 3)
