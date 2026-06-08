@@ -51,7 +51,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
     console.log('\n' + '='.repeat(60));
-    console.log('  CarCheck Backend v3.0 - ENTERPRISE EDITION');
+    console.log('  CarCheck Backend v4.0 - ENTERPRISE EDITION');
     console.log('='.repeat(60));
     console.log(`  Endereço:  http://10.10.1.100:${PORT}`);
     console.log(`  Ambiente:  ${process.env.NODE_ENV || 'production'}`);

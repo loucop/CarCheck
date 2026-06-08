@@ -205,7 +205,7 @@ router.get('/health', async (req, res) => {
                 status: 'online',
                 database: 'connected',
                 timestamp: new Date().toISOString(),
-                version: '3.0.0'
+                version: '4.0.0'
             }
         });
     } catch (err) {

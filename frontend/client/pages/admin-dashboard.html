@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Painel Admin - CarCheck</title>
+    <link rel="stylesheet" href="../css/style.css" />
+    <style>
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 30px;
+      }
+
+      .dash-card {
+        background: #1e293b;
+        padding: 30px 25px;
+        border-radius: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: transform 0.2s, border-color 0.2s, background 0.2s;
+        border: 2px solid transparent;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 160px;
+      }
+
+      .dash-card:hover {
+        transform: translateY(-5px);
+        border-color: #6366f1;
+        background: #26334d;
+      }
+
+      .dash-card .icon {
+        font-size: 2.8rem;
+        margin-bottom: 14px;
+      }
+
+      .dash-card h3 {
+        color: #f8fafc;
+        margin: 0 0 8px;
+        font-size: 1.2rem;
+      }
+
+      .dash-card p {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        line-height: 1.4;
+        margin: 0;
+      }
+
+      .btn-voltar {
+        background: #475569;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.95rem;
+        transition: background 0.2s;
+      }
+
+      .btn-voltar:hover { background: #334155; }
+    </style>
+  </head>
+  <body>
+    <div class="card" style="max-width: 900px; margin: 40px auto;">
+
+      <div style="margin-bottom: 28px;">
+        <button class="btn-voltar" onclick="window.location.href='menu.html'" style="display: inline-block; margin-bottom: 18px;">
+          ← Menu
+        </button>
+        <h2 style="margin: 0 0 6px; color: #f8fafc; font-size: 1.4rem;">Painel Administrativo</h2>
+        <p style="margin: 0; color: #94a3b8; font-size: 0.875rem;">
+          Bem-vindo, <span id="nome-admin">...</span>
+        </p>
+      </div>
+
+      <div class="dashboard-grid">
+
+        <div class="dash-card" onclick="window.location.href='admin.html'">
+          <div class="icon">📋</div>
+          <h3>Relatório de Inspeções</h3>
+          <p>Auditoria completa de checklists FOR 181 realizados.</p>
+        </div>
+
+        <div class="dash-card" onclick="window.location.href='admin-bdv.html'">
+          <div class="icon">🚐</div>
+          <h3>Relatório de Viagens (BDV)</h3>
+          <p>Boletins diários de veículos, paradas e KM percorrido.</p>
+        </div>
+
+        <div class="dash-card" onclick="window.location.href='admin.html'">
+          <div class="icon">👥</div>
+          <h3>Gestão de Funcionários</h3>
+          <p>Cadastro e gerenciamento de motoristas e vistoriadores.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const token   = localStorage.getItem('token');
+        const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
+        if (!token || !usuario || usuario.nivel_acesso !== 'admin') {
+          window.location.href = 'login.html';
+          return;
+        }
+        document.getElementById('nome-admin').textContent = usuario.nome.toUpperCase();
+      })();
+    </script>
+  </body>
+</html>

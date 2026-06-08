@@ -110,6 +110,7 @@ const schemas = {
         matricula: z.string().optional(),
         veiculo_id: z.coerce.number().int().positive().optional(),
         coligada: z.string().optional(),
+        status: z.enum(['aberto', 'encerrado']).optional(),
         data_inicio: z.string().optional(),
         data_fim: z.string().optional(),
         limit: z.coerce.number().int().positive().max(500).default(100),

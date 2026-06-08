@@ -246,7 +246,8 @@ async function finalizarRelatorio(event) {
 
     if (resposta.ok) {
       alert("✅ Checklist registrado com sucesso!");
-      window.location.href = "bdv.html";
+      const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+      window.location.href = usuario.nivel_acesso === 'motorista' ? 'bdv.html' : 'menu.html';
     } else {
       console.error('[ERRO] Detalhes:', resultado);
       alert(`❌ Erro: ${resultado.error || JSON.stringify(resultado)}`);

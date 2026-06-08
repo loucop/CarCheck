@@ -463,6 +463,26 @@
         if (estado === 'andamento')  document.getElementById('estado-andamento').style.display = 'block';
       }
 
+      // ─── API: pré-preencher KM inicial ────────────────────────────
+      async function preencherKmInicial() {
+        const token     = localStorage.getItem('token');
+        const veiculoId = String(localStorage.getItem('veiculo_id') || '');
+        if (!veiculoId) return;
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/veiculos`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (!res.ok) return;
+          const json = await res.json();
+          const veiculo = (json.data || []).find(v => String(v.id) === veiculoId);
+          if (veiculo && veiculo.km_atual != null) {
+            document.getElementById('km-inicial').value = veiculo.km_atual;
+          }
+        } catch (err) {
+          console.error('[BDV] Erro ao buscar KM atual do veículo:', err);
+        }
+      }
+
       // ─── API: verificar BDV ativo ──────────────────────────────────
       async function verificarBDVAtivo() {
         mostrarEstado('loading');
@@ -479,6 +499,7 @@
           }
 
           if (res.status === 404) {
+            await preencherKmInicial();
             mostrarEstado('abrir');
             return;
           }

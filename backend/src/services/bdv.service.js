@@ -91,6 +91,23 @@ const bdvService = {
             };
         }
 
+        const lastParada = await bdvRepository.findLastParada(conn, bdv_id);
+        if (lastParada && lastParada.km != null && data.km != null && data.km < lastParada.km) {
+            throw {
+                message: `KM inválido: informado (${data.km}) menor que o da última parada (${lastParada.km})`,
+                code: ERROR_CODES.KM_INVALID,
+                statusCode: 400
+            };
+        }
+
+        if (data.km != null && data.km < bdv.km_inicial) {
+            throw {
+                message: `KM da parada não pode ser menor que o KM inicial do BDV (${bdv.km_inicial})`,
+                code: ERROR_CODES.KM_INVALID,
+                statusCode: 400
+            };
+        }
+
         const paradaId = await bdvRepository.addParada(conn, bdv_id, data);
 
         return { id: String(paradaId), bdv_id: String(bdv_id) };
@@ -167,6 +184,15 @@ const bdvService = {
         if (data.km_final < bdv.km_inicial) {
             throw {
                 message: `KM final (${data.km_final}) menor que KM inicial (${bdv.km_inicial})`,
+                code: ERROR_CODES.KM_INVALID,
+                statusCode: 400
+            };
+        }
+
+        const maxParadaKm = await bdvRepository.findMaxParadaKm(conn, bdv_id);
+        if (maxParadaKm != null && data.km_final < maxParadaKm) {
+            throw {
+                message: `KM final (${data.km_final}) menor que o KM máximo das paradas (${maxParadaKm})`,
                 code: ERROR_CODES.KM_INVALID,
                 statusCode: 400
             };

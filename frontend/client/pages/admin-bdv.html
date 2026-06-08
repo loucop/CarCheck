@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarCheck - Relatório BDV</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .admin-container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .btn-voltar {
+            background: #64748b;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .btn-voltar:hover { background: #475569; }
+
+        .filtros-container {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .filtro-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .filtro-group label {
+            font-weight: bold;
+            color: #334155;
+            font-size: 0.85rem;
+        }
+
+        .filtro-group input,
+        .filtro-group select {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: white;
+            color: #1e293b;
+        }
+
+        .filtro-group select option {
+            background: white;
+            color: #1e293b;
+        }
+
+        .btn-buscar {
+            background: #10b981;
+            color: white;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.95rem;
+            transition: background 0.2s;
+            align-self: flex-end;
+        }
+
+        .btn-buscar:hover { background: #059669; }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            color: #000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            min-width: 700px;
+        }
+
+        th, td {
+            padding: 12px 14px;
+            border: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        th {
+            background-color: #1e293b;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .tr-main {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .tr-main:nth-child(even) { background-color: #f9fafb; }
+        .tr-main:hover { background-color: #e0f2fe !important; }
+
+        .tr-detail {
+            display: none;
+            background: #f1f5f9;
+        }
+
+        .tr-detail td {
+            padding: 0;
+            border-top: none;
+        }
+
+        .paradas-inner {
+            padding: 12px 20px 16px;
+        }
+
+        .paradas-title {
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #475569;
+            margin-bottom: 8px;
+        }
+
+        .paradas-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            box-shadow: none;
+            min-width: 0;
+        }
+
+        .paradas-table th {
+            background: #334155;
+            font-size: 0.75rem;
+            padding: 7px 10px;
+        }
+
+        .paradas-table td {
+            padding: 8px 10px;
+            border-color: #e2e8f0;
+            background: white;
+        }
+
+        .paradas-table tr:last-child td { border-bottom: none; }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .badge-aberto {
+            background: rgba(16,185,129,0.15);
+            color: #059669;
+            border: 1px solid #6ee7b7;
+        }
+
+        .badge-encerrado {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        .expand-icon {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-left: 4px;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+
+        .tr-main.expanded .expand-icon { transform: rotate(90deg); }
+
+        .sem-resultados {
+            text-align: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        @media (max-width: 600px) {
+            .filtro-group input,
+            .filtro-group select { min-width: 140px; }
+            .admin-header h1 { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+
+        <div class="admin-header">
+            <div>
+                <h1 style="margin: 0; color: #1e293b;">Relatório de Viagens (BDV)</h1>
+                <p style="margin: 5px 0 0 0; color: #64748b;">Auditoria de boletins diários de veículos</p>
+            </div>
+            <button onclick="window.location.href='admin.html'" class="btn-voltar">
+                &larr; Voltar ao Painel
+            </button>
+        </div>
+
+        <div class="filtros-container">
+            <div class="filtro-group">
+                <label for="filtro-inicio">Data Início</label>
+                <input type="date" id="filtro-inicio" />
+            </div>
+            <div class="filtro-group">
+                <label for="filtro-fim">Data Fim</label>
+                <input type="date" id="filtro-fim" />
+            </div>
+            <div class="filtro-group">
+                <label for="filtro-coligada">Coligada</label>
+                <select id="filtro-coligada">
+                    <option value="">Todas</option>
+                    <option value="angels">Angels</option>
+                    <option value="cemax">Cemax</option>
+                </select>
+            </div>
+            <div class="filtro-group">
+                <label for="filtro-status">Status</label>
+                <select id="filtro-status">
+                    <option value="">Todos</option>
+                    <option value="aberto">Aberto</option>
+                    <option value="encerrado">Encerrado</option>
+                </select>
+            </div>
+            <button class="btn-buscar" onclick="buscar()">Buscar</button>
+        </div>
+
+        <div id="info-resultado" style="font-size:0.85rem; color:#64748b; margin-bottom:6px;"></div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Motorista</th>
+                        <th>Veículo</th>
+                        <th>Coligada</th>
+                        <th>KM Inicial</th>
+                        <th>KM Final</th>
+                        <th>Paradas</th>
+                        <th>Status</th>
+                        <th>Fora da Base</th>
+                    </tr>
+                </thead>
+                <tbody id="corpo-tabela">
+                    <tr>
+                        <td colspan="9" class="sem-resultados">
+                            Use os filtros acima e clique em Buscar.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        // ─── Auth ──────────────────────────────────────────────────────
+        (function () {
+            const token   = localStorage.getItem('token');
+            const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
+            if (!token || !usuario || usuario.nivel_acesso !== 'admin') {
+                window.location.href = 'login.html';
+            }
+        })();
+
+        // ─── State ────────────────────────────────────────────────────
+        // Stores fetched paradas keyed by bdv id string
+        let paradasCache = {};
+
+        // ─── Buscar ───────────────────────────────────────────────────
+        async function buscar() {
+            paradasCache = {};
+            const inicio   = document.getElementById('filtro-inicio').value;
+            const fim      = document.getElementById('filtro-fim').value;
+            const coligada = document.getElementById('filtro-coligada').value;
+            const status   = document.getElementById('filtro-status').value;
+
+            const params = new URLSearchParams();
+            if (inicio)   params.set('data_inicio', inicio);
+            if (fim)      params.set('data_fim', fim);
+            if (coligada) params.set('coligada', coligada);
+            if (status)   params.set('status', status);
+            params.set('limit', '500');
+
+            const corpo = document.getElementById('corpo-tabela');
+            corpo.innerHTML = '<tr><td colspan="9" class="sem-resultados">Carregando...</td></tr>';
+            document.getElementById('info-resultado').textContent = '';
+
+            const token = localStorage.getItem('token');
+            try {
+                const res = await fetch(`${CONFIG.API_BASE_URL}/admin/bdv?${params}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.status === 401) {
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                if (!res.ok) {
+                    corpo.innerHTML = '<tr><td colspan="9" class="sem-resultados">Erro ao buscar dados.</td></tr>';
+                    return;
+                }
+
+                const json = await res.json();
+                const registros = json.data || [];
+
+                renderTabela(registros);
+                carregarContagemParadas(registros, token);
+
+            } catch (err) {
+                console.error('[BDV ADMIN] Erro:', err);
+                corpo.innerHTML = '<tr><td colspan="9" class="sem-resultados">Erro de comunicação com o servidor.</td></tr>';
+            }
+        }
+
+        // ─── Render ───────────────────────────────────────────────────
+        function renderTabela(registros) {
+            const corpo = document.getElementById('corpo-tabela');
+            document.getElementById('info-resultado').textContent =
+                `${registros.length} registro(s) encontrado(s)`;
+
+            if (!registros.length) {
+                corpo.innerHTML = '<tr><td colspan="9" class="sem-resultados">Nenhum registro encontrado para os filtros selecionados.</td></tr>';
+                return;
+            }
+
+            corpo.innerHTML = registros.map(r => {
+                const bdvId = String(r.id);
+                return `
+                    <tr class="tr-main" id="row-${bdvId}" onclick="toggleParadas('${bdvId}', this)">
+                        <td>${formatarData(r.data_abertura)}</td>
+                        <td>${escHtml(r.motorista || r.matricula)}</td>
+                        <td>${escHtml(r.placa || '—')}${r.modelo ? `<br><small style="color:#94a3b8">${escHtml(r.modelo)}</small>` : ''}</td>
+                        <td style="text-transform:uppercase">${escHtml(r.coligada || '—')}</td>
+                        <td>${r.km_inicial ?? '—'}</td>
+                        <td>${r.km_final ?? '—'}</td>
+                        <td id="count-${bdvId}"><em style="color:#94a3b8;font-size:0.8rem">...</em><span class="expand-icon">&#9658;</span></td>
+                        <td>${r.status === 'aberto'
+                            ? '<span class="badge badge-aberto">Aberto</span>'
+                            : '<span class="badge badge-encerrado">Encerrado</span>'}</td>
+                        <td>${r.encerrado_fora_base ? '<strong style="color:#f59e0b">Sim</strong>' : 'Não'}</td>
+                    </tr>
+                    <tr class="tr-detail" id="detail-${bdvId}">
+                        <td colspan="9">
+                            <div class="paradas-inner" id="paradas-inner-${bdvId}">
+                                <div class="paradas-title">Paradas</div>
+                                <em style="color:#94a3b8">Carregando...</em>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ─── Contagem de paradas em background ───────────────────────
+        function carregarContagemParadas(registros, token) {
+            registros.forEach(r => {
+                const bdvId = String(r.id);
+                fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                .then(res => res.json())
+                .then(json => {
+                    const paradas = json.data?.paradas || [];
+                    paradasCache[bdvId] = paradas;
+                    const cell = document.getElementById(`count-${bdvId}`);
+                    if (cell) {
+                        cell.innerHTML = `${paradas.length}<span class="expand-icon">&#9658;</span>`;
+                    }
+                })
+                .catch(() => {
+                    const cell = document.getElementById(`count-${bdvId}`);
+                    if (cell) {
+                        cell.innerHTML = `?<span class="expand-icon">&#9658;</span>`;
+                    }
+                });
+            });
+        }
+
+        // ─── Expandir paradas ─────────────────────────────────────────
+        async function toggleParadas(bdvId, trEl) {
+            const detailRow  = document.getElementById(`detail-${bdvId}`);
+            const isVisible  = detailRow.style.display === 'table-row';
+
+            if (isVisible) {
+                detailRow.style.display = 'none';
+                trEl.classList.remove('expanded');
+                return;
+            }
+
+            detailRow.style.display = 'table-row';
+            trEl.classList.add('expanded');
+
+            // If already fetched, just show
+            if (paradasCache[bdvId] !== undefined) {
+                renderParadas(bdvId, paradasCache[bdvId]);
+                return;
+            }
+
+            const token = localStorage.getItem('token');
+            try {
+                const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                const paradas = json.data?.paradas || [];
+                paradasCache[bdvId] = paradas;
+
+                const countCell = document.getElementById(`count-${bdvId}`);
+                if (countCell) {
+                    countCell.innerHTML = `${paradas.length}<span class="expand-icon">&#9658;</span>`;
+                }
+
+                renderParadas(bdvId, paradas);
+
+            } catch (err) {
+                document.getElementById(`paradas-inner-${bdvId}`).innerHTML =
+                    '<em style="color:#ef4444">Erro ao carregar paradas.</em>';
+            }
+        }
+
+        function renderParadas(bdvId, paradas) {
+            const container = document.getElementById(`paradas-inner-${bdvId}`);
+
+            if (!paradas.length) {
+                container.innerHTML = '<div class="paradas-title">Paradas</div><em style="color:#94a3b8">Nenhuma parada registrada.</em>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="paradas-title">Paradas (${paradas.length})</div>
+                <table class="paradas-table">
+                    <thead>
+                        <tr>
+                            <th>Local Saída</th>
+                            <th>Local Chegada</th>
+                            <th>Hora Saída</th>
+                            <th>Hora Chegada</th>
+                            <th>KM</th>
+                            <th>Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${paradas.map(p => `
+                            <tr>
+                                <td>${escHtml(p.local_saida)}</td>
+                                <td>${p.local_chegada
+                                    ? escHtml(p.local_chegada)
+                                    : '<em style="color:#f59e0b">Em andamento</em>'}</td>
+                                <td>${formatarData(p.hora_saida)}</td>
+                                <td>${p.hora_chegada ? formatarData(p.hora_chegada) : '—'}</td>
+                                <td>${p.km ?? '—'}</td>
+                                <td>${p.observacao ? escHtml(p.observacao) : '—'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // ─── Helpers ──────────────────────────────────────────────────
+        function formatarData(str) {
+            if (!str) return '—';
+            const d = new Date(str);
+            if (isNaN(d)) return str;
+            return d.toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        }
+
+        function escHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+    </script>
+</body>
+</html>

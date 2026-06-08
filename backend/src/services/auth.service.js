@@ -46,7 +46,7 @@ const authService = {
                 nivel_acesso: funcionario.nivel_acesso 
             },
             process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN }
+            { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
         );
 
         return {

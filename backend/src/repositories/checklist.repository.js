@@ -77,23 +77,6 @@ const checklistRepository = {
 
         return await conn.query(query, params);
     },
-
-    async findById(conn, id) {
-        const query = `
-            SELECT 
-                c.*,
-                v.placa,
-                v.modelo,
-                f.nome as motorista
-            FROM checklists c
-            LEFT JOIN veiculos v ON v.id = c.veiculo_id
-            LEFT JOIN funcionarios f ON f.matricula = c.matricula
-            WHERE c.id = ?
-            LIMIT 1
-        `;
-        const rows = await conn.query(query, [id]);
-        return rows[0] || null;
-    }
 };
 
 module.exports = checklistRepository;

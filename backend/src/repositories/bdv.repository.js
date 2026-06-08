@@ -127,6 +127,22 @@ const bdvRepository = {
         return { ...bdvRows[0], paradas };
     },
 
+    async findLastParada(conn, bdv_id) {
+        const rows = await conn.query(
+            'SELECT km FROM bdv_paradas WHERE bdv_id = ? ORDER BY id DESC LIMIT 1',
+            [bdv_id]
+        );
+        return rows[0] || null;
+    },
+
+    async findMaxParadaKm(conn, bdv_id) {
+        const rows = await conn.query(
+            'SELECT MAX(km) AS max_km FROM bdv_paradas WHERE bdv_id = ?',
+            [bdv_id]
+        );
+        return rows[0]?.max_km ?? null;
+    },
+
     async findAllBDV(conn, filters = {}) {
         let query = `
             SELECT
@@ -165,6 +181,11 @@ const bdvRepository = {
         if (filters.coligada) {
             conditions.push('b.coligada = ?');
             params.push(filters.coligada);
+        }
+
+        if (filters.status) {
+            conditions.push('b.status = ?');
+            params.push(filters.status);
         }
 
         if (filters.data_inicio) {
