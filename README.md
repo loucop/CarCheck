@@ -30,6 +30,10 @@ CarCheck digitizes vehicle inspection workflows and daily trip logs (BDV) for op
 - Stop registration and tracking
 - JWT authentication and role-based access control
 - Employee management
+- Real-time inspection reports
+- Trip auditing and KM tracking
+- Mobile-first interface
+- Admin dashboard
 
 ---
 
@@ -55,7 +59,6 @@ CarCheck digitizes vehicle inspection workflows and daily trip logs (BDV) for op
                     auth.service.js
                     checklist.service.js
                     bdv.service.js
-                    image.service.js
                 repositories/
                     funcionario.repository.js
                     checklist.repository.js
@@ -72,8 +75,8 @@ CarCheck digitizes vehicle inspection workflows and daily trip logs (BDV) for op
                     response.js
         frontend/
             client/
-                pages/                  login, menu, selecao, checklist, admin
-                js/                     auth, checklist, admin, frota, pdf-engine, config
+                pages/                  login, menu, selecao, checklist, bdv, admin, admin-dashboard, admin-bdv
+                js/                     auth, checklist, admin, frota, config
                 css/
                     style.css
 
@@ -87,6 +90,7 @@ CarCheck digitizes vehicle inspection workflows and daily trip logs (BDV) for op
 | GET    | /api/veiculos                 | JWT         | List fleet vehicles       |
 | POST   | /api/checklist                | JWT         | Submit vehicle inspection |
 | POST   | /api/bdv                      | JWT         | Open trip log (BDV)       |
+| GET    | /api/bdv/ativo                | JWT         | Get driver's active BDV   |
 | GET    | /api/bdv/:id                  | JWT         | Get BDV with stops        |
 | POST   | /api/bdv/:id/paradas          | JWT         | Register stop             |
 | PATCH  | /api/bdv/:id/paradas/:pid     | JWT         | Close stop                |
@@ -140,6 +144,9 @@ No permission is granted to use, copy, modify, distribute, sublicense, deploy fo
 ## Author
 
 **Leonardo Andrade**
+
 IT Professional | Backend Developer
+
 Rio de Janeiro, Brazil
+
 [github.com/loucop](https://github.com/loucop)
