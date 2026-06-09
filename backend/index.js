@@ -46,6 +46,20 @@ app.use(errorHandler);
 // INICIALIZAÇÃO
 // ==========================================
 
+const JWT_SECRET = process.env.JWT_SECRET;
+const WEAK_DEFAULTS = [
+    'mude_este_secret_agora_2026_carcheck_production',
+    'change_in_production',
+    'secret',
+    '',
+    `generate_with__node_-e_"console.log(require('crypto').randomBytes(48).toString('hex'))"`
+];
+
+if (!JWT_SECRET || WEAK_DEFAULTS.includes(JWT_SECRET) || JWT_SECRET.length < 32) {
+    console.error('FATAL: JWT_SECRET is missing, weak, or default. Set a strong secret in .env before starting.');
+    process.exit(1);
+}
+
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
