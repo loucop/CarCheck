@@ -5,6 +5,15 @@
 let funcionariosLista = [];
 let filtroAtivo = null;
 
+// Escapa dados controlados pelo usuário antes de inserir em innerHTML (previne XSS)
+function escHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 function verificarSeguranca() {
     const usuario = JSON.parse(localStorage.getItem("usuario"));
     const token = localStorage.getItem("token");
@@ -110,19 +119,19 @@ async function carregarRelatorios(funcionarioId = null) {
                 : "Data Inválida";
 
             const rotaBadge = (item.local_origem && item.local_destino)
-                ? `<small style="color: #3b82f6;">${item.local_origem} → ${item.local_destino}</small>`
+                ? `<small style="color: #3b82f6;">${escHtml(item.local_origem)} → ${escHtml(item.local_destino)}</small>`
                 : '<small style="color: #94a3b8;">Sem rota informada</small>';
 
             return `
                 <tr>
                     <td>${dataFormatada}</td>
-                    <td>${item.motorista ?? "Não identificado"}</td>
+                    <td>${item.motorista ? escHtml(item.motorista) : "Não identificado"}</td>
                     <td>
-                        ${item.placa ?? "---"}
+                        ${item.placa ? escHtml(item.placa) : "---"}
                         <br>
-                        <small style="color: #64748b;">${item.modelo ?? ""}</small>
+                        <small style="color: #64748b;">${escHtml(item.modelo)}</small>
                         <br>
-                        <a href="#" onclick="verHistoricoVeiculo(event, '${item.veiculo_id || ''}', '${item.placa || ''}'); return false;"
+                        <a href="#" onclick="verHistoricoVeiculo(event, '${escHtml(item.veiculo_id)}', '${escHtml(item.placa)}'); return false;"
                            style="font-size: 0.85rem; color: #3b82f6; text-decoration: none;">
                             Ver Histórico Completo
                         </a>
@@ -195,8 +204,8 @@ function verDetalhes(id) {
 
             itensHTML += `
                 <li style="padding: 8px 0; border-bottom: 1px solid #334155;">
-                    <span style="color: ${corTexto}; font-weight: bold;">${badge} ${itemNome}</span>
-                    ${obs ? `<br><small style="color: #94a3b8; margin-left: 25px;">Obs: ${obs}</small>` : ''}
+                    <span style="color: ${corTexto}; font-weight: bold;">${badge} ${escHtml(itemNome)}</span>
+                    ${obs ? `<br><small style="color: #94a3b8; margin-left: 25px;">Obs: ${escHtml(obs)}</small>` : ''}
                 </li>
             `;
         }
@@ -222,8 +231,8 @@ function verDetalhes(id) {
     const rotaHTML = `
         <div style="background: rgba(59,130,246,0.12); padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 15px;">
             <h4 style="margin-top: 0; color: #f8fafc;">Rota Informada:</h4>
-            <p style="margin: 5px 0;"><strong>Origem:</strong> ${registro.local_origem || '<span style="color: #94a3b8;">Não informado</span>'}</p>
-            <p style="margin: 5px 0;"><strong>Destino:</strong> ${registro.local_destino || '<span style="color: #94a3b8;">Não informado</span>'}</p>
+            <p style="margin: 5px 0;"><strong>Origem:</strong> ${registro.local_origem ? escHtml(registro.local_origem) : '<span style="color: #94a3b8;">Não informado</span>'}</p>
+            <p style="margin: 5px 0;"><strong>Destino:</strong> ${registro.local_destino ? escHtml(registro.local_destino) : '<span style="color: #94a3b8;">Não informado</span>'}</p>
         </div>
     `;
 
@@ -281,7 +290,7 @@ async function verHistoricoVeiculo(event, veiculoId, placa) {
 
         let historicoHTML = `
             <div style="background: rgba(59,130,246,0.12); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <h3 style="margin-top: 0; color: #f8fafc;">Veículo: ${dados.veiculo.modelo} (${placa})</h3>
+                <h3 style="margin-top: 0; color: #f8fafc;">Veículo: ${escHtml(dados.veiculo.modelo)} (${escHtml(placa)})</h3>
                 <p style="margin: 5px 0;"><strong>Total de Inspeções:</strong> ${dados.total}</p>
             </div>
         `;
@@ -314,7 +323,7 @@ async function verHistoricoVeiculo(event, veiculoId, placa) {
                     : "Data Inválida";
 
                 const rota = (item.local_origem && item.local_destino)
-                    ? `${item.local_origem} → ${item.local_destino}`
+                    ? `${escHtml(item.local_origem)} → ${escHtml(item.local_destino)}`
                     : "Não informada";
 
                 const bgColor = index % 2 === 0 ? "#1e293b" : "#0f172a";
@@ -322,7 +331,7 @@ async function verHistoricoVeiculo(event, veiculoId, placa) {
                 historicoHTML += `
                     <tr style="background: ${bgColor};">
                         <td style="padding: 10px;">${dataFormatada}</td>
-                        <td style="padding: 10px;">${item.motorista || "N/A"}</td>
+                        <td style="padding: 10px;">${item.motorista ? escHtml(item.motorista) : "N/A"}</td>
                         <td style="padding: 10px;">${item.km_entrada} KM</td>
                         <td style="padding: 10px;"><small>${rota}</small></td>
                     </tr>
