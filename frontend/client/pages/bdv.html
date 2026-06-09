@@ -454,6 +454,12 @@
       }
 
       // ─── Back-button guard ─────────────────────────────────────────
+      // Re-evaluate BDV state on bfcache restore / back-navigation.
+      // A 404 means there is NO open BDV — this is valid (e.g. the driver
+      // just finished a checklist and must open a new BDV). In that case we
+      // show the "Nova Viagem" state, never redirect to menu.html.
+      // The menu redirect only happens after a BDV is successfully closed
+      // (see encerrarViagem).
       window.addEventListener('pageshow', async () => {
         const token = localStorage.getItem('token');
         if (!token) return;
@@ -461,9 +467,24 @@
           const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
+
+          if (res.status === 401) {
+            localStorage.clear();
+            window.location.href = 'login.html';
+            return;
+          }
+
           if (res.status === 404) {
-            history.replaceState(null, '', 'menu.html');
-            window.location.replace('menu.html');
+            await preencherKmInicial();
+            mostrarEstado('abrir');
+            return;
+          }
+
+          if (res.ok) {
+            const json = await res.json();
+            bdvAtivo = json.data;
+            preencherAndamento();
+            mostrarEstado('andamento');
           }
         } catch (e) { /* network error — stay */ }
       });
@@ -750,6 +771,11 @@
       function fecharModalEncerrar() { fecharModal('modal-encerrar'); }
 
       async function encerrarViagem() {
+        if (!bdvAtivo) {
+          window.location.replace('menu.html');
+          return;
+        }
+
         const kmFinal      = document.getElementById('km-final').value.trim();
         const combustivel  = document.getElementById('combustivel-retorno').value.trim();
         const foraBase     = document.getElementById('fora-base').checked;

@@ -20,7 +20,17 @@ const checklistService = {
                 };
             }
 
-            // 2. Validação de KM
+            // 2. Duplicate submission guard (permanent: one unlinked checklist per day per driver)
+            const pendente = await checklistRepository.findPendingTodayByMatricula(conn, data.matricula);
+            if (pendente) {
+                throw {
+                    message: 'Você já possui um checklist pendente para hoje. Finalize o BDV antes de iniciar um novo checklist.',
+                    code: ERROR_CODES.DUPLICATE_ENTRY,
+                    statusCode: 409
+                };
+            }
+
+            // 3. Validação de KM
             const ultimoKm = veiculo.km_atual || 0;
             if (data.km_entrada < ultimoKm) {
                 throw {
@@ -30,7 +40,7 @@ const checklistService = {
                 };
             }
 
-            // 3. Serializar itens_status
+            // 4. Serializar itens_status
             let itensString;
             if (typeof data.itens_status === 'string') {
                 itensString = data.itens_status;

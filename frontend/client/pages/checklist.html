@@ -228,18 +228,18 @@
         };
       })();
 
-      // Back-button guard: redirect to bdv.html if an open BDV exists
-      window.addEventListener('pageshow', async () => {
+      // Back-button guard: redirect on bfcache restore if a BDV is now open
+      window.addEventListener('pageshow', function(event) {
         const token = localStorage.getItem('token');
-        if (!token) return;
-        try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (res.ok) {
-            window.location.href = 'bdv.html';
-          }
-        } catch (e) { /* network error — proceed normally */ }
+        if (!token) { window.location.replace('login.html'); return; }
+
+        if (event.persisted) {
+          fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
+            headers: { 'Authorization': 'Bearer ' + token }
+          }).then(function(r) {
+            if (r.ok) window.location.replace('bdv.html');
+          }).catch(function() {});
+        }
       });
     </script>
   </body>

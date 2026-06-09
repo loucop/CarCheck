@@ -44,6 +44,18 @@ const checklistRepository = {
         return rows[0].total;
     },
 
+    async findPendingTodayByMatricula(conn, matricula) {
+        const query = `
+            SELECT id FROM checklists
+            WHERE matricula = ?
+              AND DATE(data_inspecao) = CURDATE()
+              AND id NOT IN (SELECT checklist_id FROM bdv WHERE checklist_id IS NOT NULL)
+            ORDER BY id DESC LIMIT 1
+        `;
+        const rows = await conn.query(query, [matricula]);
+        return rows.length > 0 ? rows[0] : null;
+    },
+
     async findRelatorio(conn, funcionarioMatricula, limit, offset) {
         let query = `
             SELECT 

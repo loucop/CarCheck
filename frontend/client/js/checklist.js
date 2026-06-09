@@ -179,12 +179,6 @@ async function finalizarRelatorio(event) {
   const matricula = String(user.matricula);
 
   // VALIDAÇÕES
-  console.log('[DEBUG] Iniciando finalizarRelatorio');
-  console.log('[DEBUG] kmInput:', kmInput);
-  console.log('[DEBUG] veiculoId:', veiculoId);
-  console.log('[DEBUG] matricula:', matricula);
-  console.log('[DEBUG] user:', user);
-
   if (isNaN(veiculoId)) {
     alert("❌ ERRO: Veículo não selecionado.");
     return;
@@ -208,7 +202,6 @@ async function finalizarRelatorio(event) {
   });
 
   const canvasData = canvas.toDataURL("image/png");
-  console.log('[DEBUG] Canvas tamanho:', canvasData.length, 'caracteres');
 
   const payload = {
     veiculo_id: veiculoId,
@@ -220,8 +213,6 @@ async function finalizarRelatorio(event) {
     mapa_avaria_base64: canvasData,
   };
 
-  console.log('[DEBUG] Payload:', JSON.stringify(payload, null, 2).substring(0, 500));
-
   try {
     const resposta = await fetch(`${CONFIG.API_BASE_URL}/checklist`, {
       method: "POST",
@@ -232,10 +223,7 @@ async function finalizarRelatorio(event) {
       body: JSON.stringify(payload),
     });
 
-    console.log('[DEBUG] Status da resposta:', resposta.status);
-
     const resultado = await resposta.json();
-    console.log('[DEBUG] Resposta do servidor:', resultado);
 
     if (resposta.status === 401) {
       alert("Sessão expirada. Faça login novamente.");
@@ -247,7 +235,9 @@ async function finalizarRelatorio(event) {
     if (resposta.ok) {
       alert("✅ Checklist registrado com sucesso!");
       const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
-      window.location.href = usuario.nivel_acesso === 'motorista' ? 'bdv.html' : 'menu.html';
+      const destino = usuario.nivel_acesso === 'motorista' ? 'bdv.html' : 'menu.html';
+      history.replaceState(null, '', destino);
+      window.location.replace(destino);
     } else {
       console.error('[ERRO] Detalhes:', resultado);
       alert(`❌ Erro: ${resultado.error || JSON.stringify(resultado)}`);

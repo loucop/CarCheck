@@ -1,5 +1,6 @@
 const bdvRepository = require('../repositories/bdv.repository');
 const veiculoRepository = require('../repositories/veiculo.repository');
+const checklistRepository = require('../repositories/checklist.repository');
 const { ERROR_CODES } = require('../utils/constants');
 
 const bdvService = {
@@ -44,6 +45,12 @@ const bdvService = {
                     code: ERROR_CODES.KM_INVALID,
                     statusCode: 400
                 };
+            }
+
+            // Link today's unlinked checklist if one exists
+            const checklistPendente = await checklistRepository.findPendingTodayByMatricula(conn, data.matricula);
+            if (checklistPendente) {
+                data.checklist_id = checklistPendente.id;
             }
 
             const bdvId = await bdvRepository.createBDV(conn, data);
