@@ -27,8 +27,52 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==========================================
+// RATE LIMITING - LOGIN (in-memory, no dependencies)
+// Máx. 5 tentativas por IP a cada 15 minutos
+// ==========================================
+
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutos
+const loginAttempts = new Map(); // key: IP, value: { count, resetAt }
+
+function loginRateLimiter(req, res, next) {
+    const now = Date.now();
+
+    // Limpa entradas expiradas a cada requisição
+    for (const [ip, entry] of loginAttempts) {
+        if (entry.resetAt <= now) {
+            loginAttempts.delete(ip);
+        }
+    }
+
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    let entry = loginAttempts.get(ip);
+
+    // Inicia uma nova janela se não existir ou se a anterior expirou
+    if (!entry || entry.resetAt <= now) {
+        entry = { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+        loginAttempts.set(ip, entry);
+    }
+
+    entry.count += 1;
+
+    if (entry.count > LOGIN_MAX_ATTEMPTS) {
+        return res.status(429).json({
+            success: false,
+            error: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
+            code: 'RATE_LIMIT_EXCEEDED'
+        });
+    }
+
+    next();
+}
+
+// ==========================================
 // ROTAS
 // ==========================================
+
+// Rate limiter aplicado apenas a POST /api/login, antes do router
+app.post('/api/login', loginRateLimiter);
 
 app.use('/api', routes);
 
