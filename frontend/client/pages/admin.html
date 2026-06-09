@@ -139,7 +139,8 @@
         }
         
         .modal-content {
-            background: white;
+            background: #1e293b;
+            color: #f8fafc;
             padding: 30px;
             border-radius: 12px;
             max-width: 500px;
@@ -148,14 +149,14 @@
             overflow-y: auto;
             position: relative;
         }
-        
+
         .modal-close {
             position: absolute;
             right: 15px;
             top: 15px;
             cursor: pointer;
             font-size: 28px;
-            color: #64748b;
+            color: #94a3b8;
             background: none;
             border: none;
             padding: 0;
@@ -165,7 +166,7 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         .modal-close:hover {
             color: #ef4444;
         }
@@ -225,7 +226,7 @@
                     <th>Data/Hora</th>
                     <th>Motorista</th>
                     <th>Veículo</th>
-                    <th>KM / Rota</th>
+                    <th>KM na Inspeção / Rota</th>
                     <th>Ações</th>
                 </tr>
             </thead>
@@ -239,7 +240,7 @@
     <div id="modalDetalhes" class="modal">
         <div class="modal-content" style="max-width: 800px;">
             <button onclick="fecharModal()" class="modal-close">&times;</button>
-            <h2 style="margin-top: 0; color: #1e293b;">Detalhes da Inspeção</h2>
+            <h2 style="margin-top: 0; color: #f8fafc;">Detalhes da Inspeção</h2>
             <div id="containerDesenho"></div>
         </div>
     </div>
@@ -248,7 +249,7 @@
     <div id="modalHistorico" class="modal">
         <div class="modal-content" style="max-width: 900px;">
             <button onclick="fecharModalHistorico()" class="modal-close">&times;</button>
-            <h2 style="margin-top: 0; color: #1e293b;">Histórico do Veículo</h2>
+            <h2 style="margin-top: 0; color: #f8fafc;">Histórico do Veículo</h2>
             <div id="containerHistorico"></div>
         </div>
     </div>

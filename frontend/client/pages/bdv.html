@@ -453,6 +453,21 @@
         window.location.href = 'menu.html';
       }
 
+      // ─── Back-button guard ─────────────────────────────────────────
+      window.addEventListener('pageshow', async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.status === 404) {
+            history.replaceState(null, '', 'menu.html');
+            window.location.replace('menu.html');
+          }
+        } catch (e) { /* network error — stay */ }
+      });
+
       // ─── State management ──────────────────────────────────────────
       function mostrarEstado(estado) {
         document.getElementById('estado-loading').style.display   = 'none';

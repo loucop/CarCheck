@@ -121,7 +121,7 @@
       </header>
 
       <div class="menu-grid">
-        <div class="menu-card" onclick="acessarSistema('carcheck')">
+        <div id="card-carcheck" class="menu-card" onclick="acessarSistema('carcheck')">
           <div class="icon">🚗</div>
           <h3>CarCheck</h3>
           <p>Inspeção Veicular (FOR 181), Mapa de Avarias e Registro de KM.</p>
@@ -163,12 +163,15 @@
           document.getElementById("nome-operador").innerText = usuario.nome.toUpperCase();
 
           // Controle de Acesso
-          const adminCard = document.getElementById("card-admin");
+          const adminCard    = document.getElementById("card-admin");
+          const carCheckCard = document.getElementById("card-carcheck");
 
           if (usuario.nivel_acesso === "admin") {
-              adminCard.style.display = "flex";
+              adminCard.style.display    = "flex";
+              carCheckCard.style.display = "none";
           } else {
-              adminCard.style.display = "none";
+              adminCard.style.display    = "none";
+              carCheckCard.style.display = "flex";
           }
 
           if (usuario.nivel_acesso === "motorista") {
@@ -193,6 +196,24 @@
               window.location.href = "admin-dashboard.html";
           }
       }
+
+      // Back-button guard: re-run BDV active check for motorista
+      window.addEventListener('pageshow', async () => {
+          const dadosSessao = localStorage.getItem('usuario');
+          const token       = localStorage.getItem('token');
+          if (!dadosSessao || !token) return;
+          const usuario = JSON.parse(dadosSessao);
+          if (usuario.nivel_acesso === 'motorista') {
+              try {
+                  const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
+                      headers: { 'Authorization': `Bearer ${token}` }
+                  });
+                  if (res.ok) {
+                      window.location.href = 'bdv.html';
+                  }
+              } catch (e) { /* network error — stay */ }
+          }
+      });
 
       // FINALIZAÇÃO DE SESSÃO
       function fazerLogout() {

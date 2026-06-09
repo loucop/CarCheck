@@ -227,6 +227,20 @@
           if (_init) _init();
         };
       })();
+
+      // Back-button guard: redirect to bdv.html if an open BDV exists
+      window.addEventListener('pageshow', async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            window.location.href = 'bdv.html';
+          }
+        } catch (e) { /* network error — proceed normally */ }
+      });
     </script>
   </body>
 </html>

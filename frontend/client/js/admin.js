@@ -179,8 +179,8 @@ function verDetalhes(id) {
         let countOk = 0;
         let countRuim = 0;
 
-        itensHTML = '<div style="max-height: 300px; overflow-y: auto; background: #f9fafb; padding: 15px; border-radius: 8px; margin: 15px 0;">';
-        itensHTML += '<h4 style="margin-top: 0; color: #1e293b;">Itens Verificados:</h4>';
+        itensHTML = '<div style="max-height: 300px; overflow-y: auto; background: #0f172a; padding: 15px; border-radius: 8px; margin: 15px 0;">';
+        itensHTML += '<h4 style="margin-top: 0; color: #f8fafc;">Itens Verificados:</h4>';
         itensHTML += '<ul style="list-style: none; padding: 0; margin: 0;">';
 
         for (const [itemNome, itemData] of Object.entries(itens)) {
@@ -194,16 +194,16 @@ function verDetalhes(id) {
             const corTexto = status === "OK" ? "#10b981" : "#ef4444";
 
             itensHTML += `
-                <li style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                <li style="padding: 8px 0; border-bottom: 1px solid #334155;">
                     <span style="color: ${corTexto}; font-weight: bold;">${badge} ${itemNome}</span>
-                    ${obs ? `<br><small style="color: #64748b; margin-left: 25px;">Obs: ${obs}</small>` : ''}
+                    ${obs ? `<br><small style="color: #94a3b8; margin-left: 25px;">Obs: ${obs}</small>` : ''}
                 </li>
             `;
         }
 
         itensHTML += '</ul>';
         itensHTML += `
-            <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 6px; display: flex; justify-content: space-around;">
+            <div style="margin-top: 15px; padding: 10px; background: #0f172a; border-radius: 6px; display: flex; justify-content: space-around;">
                 <span style="color: #10b981; font-weight: bold;">Conforme: ${countOk}</span>
                 <span style="color: #ef4444; font-weight: bold;">Não Conforme: ${countRuim}</span>
             </div>
@@ -220,8 +220,8 @@ function verDetalhes(id) {
 
     // Rota
     const rotaHTML = `
-        <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 15px;">
-            <h4 style="margin-top: 0; color: #1e293b;">Rota Informada:</h4>
+        <div style="background: rgba(59,130,246,0.12); padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 15px;">
+            <h4 style="margin-top: 0; color: #f8fafc;">Rota Informada:</h4>
             <p style="margin: 5px 0;"><strong>Origem:</strong> ${registro.local_origem || '<span style="color: #94a3b8;">Não informado</span>'}</p>
             <p style="margin: 5px 0;"><strong>Destino:</strong> ${registro.local_destino || '<span style="color: #94a3b8;">Não informado</span>'}</p>
         </div>
@@ -230,11 +230,11 @@ function verDetalhes(id) {
     // Mapa de avarias
     const mapaHTML = `
         <div style="margin-top: 15px;">
-            <h4 style="color: #1e293b;">Mapa de Avarias (Lataria):</h4>
+            <h4 style="color: #f8fafc;">Mapa de Avarias (Lataria):</h4>
             ${registro.mapa_avaria_base64 && registro.mapa_avaria_base64.length > 100
                 ? `<img src="${registro.mapa_avaria_base64}"
-                       style="max-width:100%; border:2px solid #cbd5e1; border-radius:8px;">`
-                : '<p style="padding:20px; text-align:center; color:#94a3b8; background: #f9fafb; border-radius: 8px;">Nenhuma avaria marcada no mapa</p>'
+                       style="max-width:100%; border:2px solid #334155; border-radius:8px;">`
+                : '<p style="padding:20px; text-align:center; color:#94a3b8; background: #0f172a; border-radius: 8px;">Nenhuma avaria marcada no mapa</p>'
             }
         </div>
     `;
@@ -280,8 +280,8 @@ async function verHistoricoVeiculo(event, veiculoId, placa) {
         const dados = resultado.data || resultado;
 
         let historicoHTML = `
-            <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <h3 style="margin-top: 0;">Veículo: ${dados.veiculo.modelo} (${placa})</h3>
+            <div style="background: rgba(59,130,246,0.12); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h3 style="margin-top: 0; color: #f8fafc;">Veículo: ${dados.veiculo.modelo} (${placa})</h3>
                 <p style="margin: 5px 0;"><strong>Total de Inspeções:</strong> ${dados.total}</p>
             </div>
         `;
@@ -317,7 +317,7 @@ async function verHistoricoVeiculo(event, veiculoId, placa) {
                     ? `${item.local_origem} → ${item.local_destino}`
                     : "Não informada";
 
-                const bgColor = index % 2 === 0 ? "#f9fafb" : "white";
+                const bgColor = index % 2 === 0 ? "#1e293b" : "#0f172a";
 
                 historicoHTML += `
                     <tr style="background: ${bgColor};">
