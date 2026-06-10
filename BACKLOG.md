@@ -78,9 +78,29 @@
   (`DB_CONNECTION_LIMIT`, `JWT_EXPIRES_IN`, `HOST`).
   > Lembrete: `NODE_ENV=production` deve estar setado no deploy para o gate valer.
 
-- ⬜ **M4 — JWT em localStorage**
-  Token guardado em `localStorage` é roubável via XSS. Considerar cookie `httpOnly`+`SameSite`
-  (exige ajuste de CSRF). Decisão arquitetural — avaliar custo/benefício.
+- 🔵 **M4 — JWT em localStorage + ausência de logout server-side** *(em andamento — planejamento)*
+  **Achado completo:**
+  - Token JWT guardado em `localStorage` → roubável via XSS (vetor que A1/S1 vêm mitigando).
+  - **Não existe endpoint de logout no backend.** Logout é 100% client-side: `localStorage.clear()`
+    + redirect para `login.html` (11 pontos de `clear()` no frontend). O JWT em si nunca é invalidado.
+  - **Sem revogação:** JWT é stateless com validade de **12h** (`JWT_EXPIRES_IN`). Um token capturado
+    continua válido pelas 12h mesmo após "logout" — não há como forçar invalidação (ex.: suspeita de
+    comprometimento, ou quando um funcionário é desativado).
+  - **Dispositivos compartilhados:** motoristas usam celulares/tablets compartilhados; sem invalidação
+    real, a janela de exposição de um token vazado é grande.
+
+  **Implementação proposta (esta fase):**
+  1. Migrar o token para **cookie `httpOnly` + `Secure` + `SameSite`** (não acessível via JS → fora do
+     alcance de XSS). Exige tratamento de CSRF (token CSRF ou checagem de origem) e remover as ~30
+     leituras de `localStorage.getItem('token')` que montam o header `Authorization`.
+  2. Adicionar **`POST /api/logout`** que limpa o cookie de sessão (e, no mínimo, serve de ponto único
+     para futura denylist).
+  3. Encurtar **`JWT_EXPIRES_IN` para `2h`** — mitigação barata que reduz a janela de exposição já agora.
+
+  > 🎯 **Opção D (arquitetura-alvo ao ir a público):** **refresh token rotation** — access token curto
+  > (ex.: 15 min) + refresh token rotativo e revogável (armazenado server-side). Permite logout real e
+  > revogação imediata. Adotar nesta arquitetura quando o sistema for exposto publicamente; conecta-se
+  > ao store compartilhado do **M2** (denylist/refresh store).
 
 - 🔵 **M5 — Vulnerabilidades de dependências (npm audit)** *(parcialmente concluído em 2026-06-10)*
   Estado inicial: 4 vulnerabilidades (2 moderadas, 2 altas). Após `npm audit fix`: **2 altas restantes**.
@@ -97,6 +117,19 @@
   elimina a dependência de build nativo. API quase drop-in. Requer ajuste em `auth.service.js` e no
   script `scripts/migrate-passwords.js`, além de teste no servidor (hashes `$2a$`/`$2b$` permanecem
   compatíveis). Fazer em sessão própria, com validação de login antes/depois.
+
+- ⬜ **M6 — Planejamento de multi-tenancy (pré-requisito para vender a clientes externos)**
+  Hoje o sistema é single-tenant (uma organização cliente). Antes de comercializar para **clientes
+  externos**, planejar o isolamento de dados por tenant. Pontos a desenhar **antes** de escrever código:
+  - **Modelo de isolamento:** coluna `tenant_id` em todas as tabelas (shared schema) vs. schema/DB por
+    cliente. Avaliar o campo `coligada` já existente — é sub-divisão *dentro* de um tenant, não tenant.
+  - **Escopo em TODAS as queries:** `funcionarios`, `veiculos`, `checklists`, `bdv`, `bdv_paradas`
+    precisam filtrar por tenant; risco alto de vazamento entre clientes se esquecido em uma query.
+  - **Auth/JWT:** incluir `tenant_id` no token e aplicar em `auth.middleware` + repositórios.
+  - **Onboarding/admin:** criação de tenant, primeiro admin, billing, limites por plano.
+  - **Conexão com M4/M2:** sessão, revogação e rate limit passam a ser por-tenant.
+  Item de **planejamento/arquitetura** — produzir um RFC/decisão antes de implementar. Bloqueante para
+  a meta de negócio de venda externa.
 
 ---
 
