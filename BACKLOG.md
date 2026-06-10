@@ -176,6 +176,22 @@
   HTML estático + 46 gerados em `admin.js`) e os ~652 linhas de blocos `<style>` para classes
   em `style.css`. Maior esforço; ganho cosmético/defesa-em-profundidade, não fecha exploit ativo.
 
+- ⬜ **B8 — Gerenciamento de processo (PM2 ou serviço do Windows)**
+  Hoje o backend morre quando o terminal é fechado e não reinicia sozinho após crash. Configurar
+  **PM2** (ou um serviço do Windows) para manter o processo vivo, reiniciar em falha e subir no boot.
+  Correção rápida (~30 min). **Obrigatório antes do deploy público.**
+
+- ⬜ **B9 — Suíte de testes de integração**
+  No mínimo, testes de rota da API cobrindo: `login`, submissão de `checklist`, abertura/encerramento
+  de `BDV`, e endpoints `admin`. Expande/concretiza o **B5**. **Obrigatório antes de fazer fork para o
+  sistema de supervisor ou de vender a clientes externos** (rede de segurança contra regressões).
+
+- ⬜ **B10 — Sistema de migrations de banco**
+  Mudanças de schema são aplicadas **manualmente, sem rastreamento** (ver memória/decisão atual).
+  Adotar uma ferramenta de migrations versionadas (ex.: node-pg-migrate equivalente p/ MariaDB, Umzug,
+  Flyway) com histórico aplicado. **Obrigatório antes do deploy multi-cliente/multi-tenant** (M6) —
+  sem isso, sincronizar schema entre tenants/ambientes é inviável.
+
 ---
 
 ## 🚀 Deploy em Produção (checklist)
