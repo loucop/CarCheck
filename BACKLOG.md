@@ -102,6 +102,70 @@
   > revogação imediata. Adotar nesta arquitetura quando o sistema for exposto publicamente; conecta-se
   > ao store compartilhado do **M2** (denylist/refresh store).
 
+  ### Plano de implementação (decisões confirmadas)
+
+  **Decisões:** `cookie-parser` ✅ · helper `apiFetch` ✅ · CSRF por checagem de Origin ✅ · `GET /api/me` ✅
+
+  **Restrições de arquitetura (norteiam tudo):**
+  - Frontend `:10081` e backend `:3000` → **mesmo host (same-site), origem diferente (cross-origin)**.
+    Cookie `SameSite=Lax` é enviado (porta não afeta "site"); CORS precisa de `credentials: true` +
+    origem específica (allowlist do A2) e `fetch` com `credentials: 'include'`.
+  - **HTTP na LAN agora, HTTPS (Cloudflare) depois** → flag `secure` do cookie deve ser **dirigida por
+    env** (`false` na LAN, `true` em produção). `SameSite=None` impossível em HTTP → usar `Lax`.
+  - **httpOnly quebra os guards client-side:** JS não lê mais o cookie. Os ~30 `getItem('token')` usados
+    como "estou logado?" passam a checar presença de **`usuario`** (UX) + tratamento de **401 → login**
+    (enforcement real no servidor). Maior fonte de edições.
+  - **Estratégia incremental (sem big-bang):** backend aceita **cookie OU header `Authorization`** na
+    transição; remove o fallback de header só na Fase 3.
+
+  **Fase 0 — quick win independente**
+  - `backend/.env.example` (+ `.env` do servidor): `JWT_EXPIRES_IN=2h` (reduz a janela já agora).
+
+  **Fase 1 — Backend, retrocompatível (frontend atual continua funcionando)**
+  - `backend/package.json` / `package-lock.json`: adicionar **`cookie-parser`**.
+  - `backend/index.js`: `app.use(cookieParser())`; adicionar **`credentials: true`** ao `cors({...})`.
+  - `backend/src/controllers/auth.controller.js`: em `login`, `res.cookie('token', token, { httpOnly,
+    sameSite:'lax', secure:<env>, maxAge:<= expiry>, path:'/' })` (ainda retorna token no body nesta
+    fase); novo handler **`logout`** → `res.clearCookie('token', {mesmas opts})`.
+  - `backend/src/middlewares/auth.middleware.js`: ler token de **`req.cookies?.token` primeiro, fallback
+    para header `Authorization`**.
+  - `backend/src/middlewares/csrf.middleware.js` **(novo)**: checagem de Origin/Referer em `POST`/`PATCH`
+    reusando a allowlist do CORS. Sem dependência nova.
+  - `backend/src/routes/index.js`: adicionar **`POST /api/logout`** → `authController.logout` (público);
+    adicionar **`GET /api/me`** (valida cookie, retorna `req.user`); aplicar o CSRF middleware nas rotas
+    de escrita.
+  - `backend/.env.example`: documentar `COOKIE_SECURE` (ou que `NODE_ENV=production` dirige `secure`);
+    opcional `COOKIE_DOMAIN` para o público.
+  - **→ Deploy + verificar:** login ainda funciona e o cookie passa a ser setado; nada quebra.
+
+  **Fase 2 — Frontend (página por página, cada uma entregável isolada)**
+  - `frontend/client/js/config.js`: adicionar helper **`apiFetch(path, opts)`** que injeta
+    `credentials:'include'` e centraliza tratamento de 401 → `login.html`.
+  - `frontend/client/js/auth.js`: login com `credentials:'include'`; **remover `setItem('token')`**
+    (mantém `setItem('usuario')`).
+  - `frontend/client/js/admin.js` (8), `checklist.js` (2), `frota.js` (2, e remover write morto de
+    `veiculo_tipo`): trocar header `Authorization` + `getItem('token')` por `apiFetch`; guards de token
+    → presença de `usuario`; `clear()` de logout → `POST /api/logout` então limpar `usuario`.
+  - `frontend/client/pages/menu.html` (4), `checklist.html` (4), `bdv.html` (16), `admin-bdv.html` (6),
+    `admin-funcionarios.html` (4): mesmo padrão.
+  - `frontend/client/pages/admin-dashboard.html`: sem fetch, mas trocar o **guard** `getItem('token')`
+    por presença de `usuario` (ou `GET /api/me`).
+  - **→ Verificar fluxo completo** (login → menu → seleção → checklist → bdv → admin → logout).
+
+  **Fase 3 — Limpeza do backend (após todo o frontend migrado — passo irreversível)**
+  - `backend/src/middlewares/auth.middleware.js`: **remover o fallback de header `Authorization`**
+    (cookie-only).
+  - `backend/src/controllers/auth.controller.js`: **parar de retornar `token` no body** do login.
+  - `backend/.env.example` / `.env`: confirmar `JWT_EXPIRES_IN=2h` alinhado ao `maxAge` do cookie.
+
+  **Ordem:** Fase 0 → Fase 1 (cookie-parser+CORS → middleware dual-read → controller set/clear → rotas
+  logout/me → CSRF) → deploy/verificar → Fase 2 (`config.js` primeiro, depois `auth.js`, depois demais
+  páginas) → Fase 3.
+  > ⚠️ **Sem acesso ao servidor (deploy manual):** cada fase exige verificação do usuário no servidor
+  > (e `npm ci` após adicionar `cookie-parser`). Ao ir a público: virar `secure:true`; se frontend/API
+  > ficarem em sites realmente distintos, mudar para `SameSite=None; Secure` + **CSRF double-submit** →
+  > ponte para a **Opção D**.
+
 - 🔵 **M5 — Vulnerabilidades de dependências (npm audit)** *(parcialmente concluído em 2026-06-10)*
   Estado inicial: 4 vulnerabilidades (2 moderadas, 2 altas). Após `npm audit fix`: **2 altas restantes**.
   - ✅ `qs` (**moderada**, DoS remoto em `qs.stringify`) via `express` — **corrigido**: `express`
