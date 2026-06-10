@@ -28,12 +28,13 @@
 
 ## 🟠 Alto
 
-- ⬜ **A1 — Auditar XSS em todas as páginas admin**
-  `escHtml` existe em `admin.js`, `admin-bdv.html`, `admin-funcionarios.html` e `bdv.html`,
-  mas não há garantia de que **todas** as interpolações em `innerHTML` estejam escapadas.
-  Revisar cada uso de `innerHTML` (lista em `admin-bdv.html`, `admin-funcionarios.html`,
-  `bdv.html`, `frota.js`, `checklist.js`) e confirmar que dados vindos da API/usuário passam
-  por `escHtml`. Vetor já explorado uma vez (S1) — alto risco residual.
+- ✅ **A1 — Auditar XSS em todas as páginas admin** *(concluído em 2026-06-10)*
+  Auditadas todas as páginas admin. 6 lacunas corrigidas — destaque para o vetor **alto**:
+  `mapa_avaria_base64` (controlado pelo motorista) era inserido sem escape no `src` de `<img>`
+  em `admin.js` (stored XSS). Também corrigidos `formatarData` (fallback cru), `formatCPF` e
+  `nivelBadge` (fallbacks crus), e `escHtml` endurecido em `admin-bdv.html`/`admin-funcionarios.html`.
+  Pendência menor não crítica: `frota.js`/`checklist.js` (telas do motorista) não foram auditadas
+  neste escopo — ver **B7**.
 
 - ⬜ **A2 — Restringir CORS**
   `backend/index.js:31` usa `app.use(cors())` sem configuração → **qualquer origem** acessa
@@ -91,6 +92,11 @@
 - ⬜ **B6 — Housekeeping do repositório**
   Remover arquivos vazios soltos no working dir (`git`, `main`) e decidir sobre `LICENSE`
   (untracked). Adicionar ao `.gitignore` se necessário.
+
+- ⬜ **B7 — Auditar XSS nas telas do motorista**
+  A auditoria de A1 cobriu apenas as páginas admin. Revisar os sinks de `innerHTML` em
+  `frota.js`, `checklist.js` e `bdv.html` (lado motorista) e confirmar escape consistente.
+  Risco menor (dados em geral próprios do usuário), mas fecha a cobertura.
 
 ---
 

@@ -254,8 +254,10 @@ function verDetalhes(id) {
     const mapaHTML = `
         <div style="margin-top: 15px;">
             <h4 style="color: #f8fafc;">Mapa de Avarias (Lataria):</h4>
-            ${registro.mapa_avaria_base64 && registro.mapa_avaria_base64.length > 100
-                ? `<img src="${registro.mapa_avaria_base64}"
+            ${registro.mapa_avaria_base64
+                && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(registro.mapa_avaria_base64)
+                && registro.mapa_avaria_base64.length > 100
+                ? `<img src="${escHtml(registro.mapa_avaria_base64)}"
                        style="max-width:100%; border:2px solid #334155; border-radius:8px;">`
                 : '<p style="padding:20px; text-align:center; color:#94a3b8; background: #0f172a; border-radius: 8px;">Nenhuma avaria marcada no mapa</p>'
             }
