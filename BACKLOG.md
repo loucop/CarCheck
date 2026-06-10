@@ -133,6 +133,23 @@
 
 ---
 
+## 🚀 Deploy em Produção (checklist)
+
+Itens a executar/validar ao publicar o sistema (ex.: via Cloudflare). Vários se conectam
+a decisões já registradas acima (A2, M1, S3).
+
+- ⬜ **Habilitar HTTPS via Cloudflare** (terminação TLS no edge).
+- ⬜ **Adicionar o domínio público em `CORS_ORIGINS`** no `.env` de produção
+  (ex.: `CORS_ORIGINS=https://carcheck.seudominio.com`) — ver **A2**.
+- ⬜ **Configurar headers de CSP nos arquivos estáticos via Cloudflare Transform Rules**
+  (**baseado em hashes**, substitui a abordagem de nonce do backend, que não alcança o HTML) — ver **M1**.
+- ⬜ **Reativar HSTS no helmet** (`hsts` está desativado para HTTP/LAN em `backend/index.js`) — ver **M1**.
+- ⬜ **Ajustar `trust proxy`** — aumentar a contagem de saltos se houver mais de um proxy
+  na frente do Express (atualmente `app.set('trust proxy', 1)`), para que o rate limiter de
+  login use o IP real do cliente — ver **S3**.
+
+---
+
 ## ✅ Concluído (referência)
 
 - ✅ **S1** — Escape de XSS em campos controlados no `admin.js` (`312a18d` + hardening em `29e3159`)
