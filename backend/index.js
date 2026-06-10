@@ -8,6 +8,12 @@ const { errorHandler, notFoundHandler } = require('./src/middlewares/errorHandle
 
 const app = express();
 
+// Confia no primeiro proxy reverso (nginx/load balancer) para que req.ip
+// reflita o IP real do cliente, e não o do proxy. Essencial para o rate
+// limiter de login funcionar por usuário em produção. Ajuste o número de
+// saltos se houver mais de um proxy na frente.
+app.set('trust proxy', 1);
+
 /**
  * ==========================================
  * PATCH GLOBAL: SERIALIZAÇÃO BIGINT
@@ -46,23 +52,35 @@ function loginRateLimiter(req, res, next) {
     }
 
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-    let entry = loginAttempts.get(ip);
+    const entry = loginAttempts.get(ip);
 
-    // Inicia uma nova janela se não existir ou se a anterior expirou
-    if (!entry || entry.resetAt <= now) {
-        entry = { count: 0, resetAt: now + LOGIN_WINDOW_MS };
-        loginAttempts.set(ip, entry);
-    }
-
-    entry.count += 1;
-
-    if (entry.count > LOGIN_MAX_ATTEMPTS) {
+    // Já atingiu o limite dentro da janela atual -> bloqueia sem processar
+    if (entry && entry.resetAt > now && entry.count >= LOGIN_MAX_ATTEMPTS) {
         return res.status(429).json({
             success: false,
             error: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
             code: 'RATE_LIMIT_EXCEEDED'
         });
     }
+
+    // Conta apenas tentativas que FALHARAM. Um login bem-sucedido limpa o
+    // contador do IP, evitando que usuários legítimos atrás de um NAT
+    // compartilhado bloqueiem uns aos outros.
+    res.on('finish', () => {
+        if (res.statusCode < 400) {
+            loginAttempts.delete(ip);
+            return;
+        }
+        if (res.statusCode === 429) return; // já estava bloqueado; não conta de novo
+
+        const at = Date.now();
+        const cur = loginAttempts.get(ip);
+        if (!cur || cur.resetAt <= at) {
+            loginAttempts.set(ip, { count: 1, resetAt: at + LOGIN_WINDOW_MS });
+        } else {
+            cur.count += 1;
+        }
+    });
 
     next();
 }

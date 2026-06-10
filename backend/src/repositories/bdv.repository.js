@@ -23,14 +23,15 @@ const bdvRepository = {
 
     async createBDV(conn, data) {
         const query = `
-            INSERT INTO bdv (matricula, veiculo_id, coligada, km_inicial, data_abertura, status)
-            VALUES (?, ?, ?, ?, NOW(), 'aberto')
+            INSERT INTO bdv (matricula, veiculo_id, coligada, km_inicial, checklist_id, data_abertura, status)
+            VALUES (?, ?, ?, ?, ?, NOW(), 'aberto')
         `;
         const result = await conn.query(query, [
             data.matricula,
             data.veiculo_id,
             data.coligada,
-            data.km_inicial
+            data.km_inicial,
+            data.checklist_id ?? null
         ]);
         return result.insertId;
     },

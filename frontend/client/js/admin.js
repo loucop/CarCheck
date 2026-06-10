@@ -5,13 +5,16 @@
 let funcionariosLista = [];
 let filtroAtivo = null;
 
-// Escapa dados controlados pelo usuário antes de inserir em innerHTML (previne XSS)
+// Escapa dados controlados pelo usuário antes de inserir em innerHTML (previne XSS).
+// Inclui aspas para ser seguro também dentro de atributos e de strings JS em onclick.
 function escHtml(str) {
-    if (!str) return '';
+    if (str === null || str === undefined) return '';
     return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function verificarSeguranca() {
@@ -131,7 +134,8 @@ async function carregarRelatorios(funcionarioId = null) {
                         <br>
                         <small style="color: #64748b;">${escHtml(item.modelo)}</small>
                         <br>
-                        <a href="#" onclick="verHistoricoVeiculo(event, '${escHtml(item.veiculo_id)}', '${escHtml(item.placa)}'); return false;"
+                        <a href="#" class="link-historico"
+                           data-veiculo-id="${escHtml(item.veiculo_id)}" data-placa="${escHtml(item.placa)}"
                            style="font-size: 0.85rem; color: #3b82f6; text-decoration: none;">
                             Ver Histórico Completo
                         </a>
@@ -147,9 +151,19 @@ async function carregarRelatorios(funcionarioId = null) {
             `;
         }).join("");
 
+        // Delegação de evento (uma única vez): evita onclick inline com dados
+        // interpolados, fechando o vetor de XSS no contexto de string JS.
+        if (!corpoTabela.dataset.histBound) {
+            corpoTabela.addEventListener('click', (event) => {
+                const link = event.target.closest('.link-historico');
+                if (!link || !corpoTabela.contains(link)) return;
+                event.preventDefault();
+                verHistoricoVeiculo(event, link.dataset.veiculoId, link.dataset.placa);
+            });
+            corpoTabela.dataset.histBound = '1';
+        }
+
         window.relatoriosCache = dados;
-        console.log('[DEBUG] Cache carregado com', dados.length, 'registros');
-        console.log('[DEBUG] Primeiro registro:', dados[0]);
 
     } catch (erro) {
         console.error("[ERRO] Falha na carga de relatórios:", erro);
