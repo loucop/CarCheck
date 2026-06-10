@@ -1,5 +1,7 @@
 ﻿const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const crypto = require('crypto');
 const path = require('path');
 require('dotenv').config();
 
@@ -27,6 +29,41 @@ BigInt.prototype.toJSON = function() {
 // ==========================================
 // MIDDLEWARES GLOBAIS
 // ==========================================
+
+// ------------------------------------------
+// SECURITY HEADERS (helmet) + CSP
+// ------------------------------------------
+// Nonce por requisição, exposto em res.locals.cspNonce para scripts inline.
+// OBS de arquitetura: hoje o backend só serve a API + backend/public; as
+// páginas HTML do admin são servidas por outro servidor estático (:10081),
+// então este CSP só vale para respostas DESTE servidor. Para proteger as
+// páginas HTML é preciso entregar o CSP no servidor que as serve (nginx/
+// Cloudflare) — e, por serem estáticas, hashes são mais adequados que nonces.
+app.use((req, res, next) => {
+    res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+    next();
+});
+
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", (req, res) => `'nonce-${res.locals.cspNonce}'`],
+            styleSrc: ["'self'", "'unsafe-inline'"], // M1-c: remover 'unsafe-inline' ao migrar styles p/ CSS
+            imgSrc: ["'self'", "data:"],             // data: necessário p/ mapa de avaria (base64)
+            connectSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            frameAncestors: ["'none'"],               // anti-clickjacking
+            upgradeInsecureRequests: null             // app roda em HTTP na LAN; não forçar HTTPS
+        }
+    },
+    // HSTS só faz sentido sob HTTPS; em HTTP/LAN seria inócuo/confuso.
+    // Reativar (e ajustar) ao publicar via Cloudflare com HTTPS.
+    hsts: false,
+    // API consumida cross-origin (frontend em :10081) -> permite recursos cross-origin.
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 
 // CORS — allowlist de origens. O host LAN é sempre permitido; origens
 // adicionais (ex.: domínio Cloudflare em produção pública) entram via a

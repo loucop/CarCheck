@@ -49,10 +49,19 @@
 
 ## 🟡 Médio
 
-- ⬜ **M1 — Adicionar cabeçalhos de segurança (helmet)**
-  Não há `helmet` nem CSP/X-Frame-Options/X-Content-Type-Options. Dado o histórico de XSS,
-  uma **Content-Security-Policy** é defesa em profundidade valiosa. Avaliar impacto dos
-  `style`/`onclick` inline existentes ao definir a CSP.
+- 🔵 **M1 — Adicionar cabeçalhos de segurança (helmet)** *(em andamento — opção 1)*
+  `helmet` instalado e configurado em `backend/index.js`: CSP com `script-src 'self'` +
+  **nonce por requisição** (`res.locals.cspNonce`), `style-src 'self' 'unsafe-inline'`,
+  `img-src 'self' data:` (mapa de avaria base64), `frame-ancestors 'none'`, `object-src 'none'`,
+  `base-uri 'self'`. `X-Powered-By` removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false`
+  (app em HTTP/LAN). Helmet aplica `script-src-attr 'none'` por padrão → bloqueia handlers inline
+  (ver M1-b).
+  > ✅ **Decisão (opção A):** M1 fica como **endurecimento apenas do backend**. O CSP das
+  > **páginas HTML do admin** (servidas pelo servidor estático `:10081`, fora do alcance deste
+  > backend) será entregue via **headers do Cloudflare** quando o sistema for publicado. Como
+  > são páginas **estáticas**, usar CSP **baseado em hashes** (não nonces) na config do Cloudflare.
+  > Reativar `hsts` nessa etapa (HTTPS). Itens M1-b/M1-c continuam válidos para reduzir a
+  > dependência de `'unsafe-inline'` quando o CSP passar a valer para o HTML.
 
 - ⬜ **M2 — Rate limiter resiliente**
   O limiter de login (`backend/index.js`) é **in-memory**: zera a cada restart e não funciona
@@ -68,6 +77,14 @@
 - ⬜ **M4 — JWT em localStorage**
   Token guardado em `localStorage` é roubável via XSS. Considerar cookie `httpOnly`+`SameSite`
   (exige ajuste de CSRF). Decisão arquitetural — avaliar custo/benefício.
+
+- ⬜ **M5 — Vulnerabilidades de dependências (npm audit)**
+  `npm audit` reporta **4 vulnerabilidades (2 moderadas, 2 altas)** em `backend/`:
+  - `qs` 6.11.1–6.15.1 (**moderada**, DoS remoto em `qs.stringify`) via `express`/`body-parser` — runtime.
+  - `tar` ≤7.5.10 (**alta**, path traversal / file overwrite na extração) via `@mapbox/node-pre-gyp`
+    (transitiva do `bcrypt`) — exploração só em tempo de build/instalação, não no runtime do servidor.
+  Corrigível com `npm audit fix` (atualiza `express` e a cadeia do `node-pre-gyp`). Validar que
+  nada quebra após o fix. Não rodado ainda para não alterar versões sem revisão.
 
 ---
 
@@ -102,6 +119,17 @@
   A auditoria de A1 cobriu apenas as páginas admin. Revisar os sinks de `innerHTML` em
   `frota.js`, `checklist.js` e `bdv.html` (lado motorista) e confirmar escape consistente.
   Risco menor (dados em geral próprios do usuário), mas fecha a cobertura.
+
+- ⬜ **M1-b — Converter handlers inline `on*=` para `addEventListener`** *(sub-item de M1)*
+  Para chegar a `script-src 'self'` sem `'unsafe-inline'`/`script-src-attr`, eliminar os ~19
+  handlers inline (`onclick`/`onload`/etc.) nas páginas admin + `verDetalhes` em `admin.js`.
+  Nonce/hash **não** cobrem handlers inline — precisam virar `addEventListener`. Pré-requisito
+  para um CSP de script estrito quando as páginas HTML passarem a receber CSP.
+
+- ⬜ **M1-c — Mover estilos inline para CSS** *(sub-item de M1)*
+  Para remover `'unsafe-inline'` de `style-src`, migrar os ~76 atributos `style="..."` (30 em
+  HTML estático + 46 gerados em `admin.js`) e os ~652 linhas de blocos `<style>` para classes
+  em `style.css`. Maior esforço; ganho cosmético/defesa-em-profundidade, não fecha exploit ativo.
 
 ---
 
