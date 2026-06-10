@@ -36,9 +36,14 @@
   Pendência menor não crítica: `frota.js`/`checklist.js` (telas do motorista) não foram auditadas
   neste escopo — ver **B7**.
 
-- ⬜ **A2 — Restringir CORS**
-  `backend/index.js:31` usa `app.use(cors())` sem configuração → **qualquer origem** acessa
-  a API. Restringir a uma allowlist de origens (host do frontend) via `cors({ origin: [...] })`.
+- ✅ **A2 — Restringir CORS** *(concluído em 2026-06-10)*
+  Allowlist de origens em `backend/index.js`. Host LAN `http://10.10.1.100:10081` sempre
+  permitido por padrão; origens extras via env `CORS_ORIGINS` (separadas por vírgula), sem
+  alterar código. Requests sem `Origin` (curl/health/apps nativos) continuam permitidos.
+  `.env.example` atualizado.
+  > ⚠️ **Ao publicar via Cloudflare:** adicionar o domínio público em `CORS_ORIGINS`
+  > (ex.: `CORS_ORIGINS=https://carcheck.seudominio.com`) no `.env` de produção, senão o
+  > frontend público será bloqueado pelo navegador.
 
 ---
 

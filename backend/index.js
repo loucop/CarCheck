@@ -28,7 +28,30 @@ BigInt.prototype.toJSON = function() {
 // MIDDLEWARES GLOBAIS
 // ==========================================
 
-app.use(cors());
+// CORS — allowlist de origens. O host LAN é sempre permitido; origens
+// adicionais (ex.: domínio Cloudflare em produção pública) entram via a
+// variável de ambiente CORS_ORIGINS (separadas por vírgula), sem mexer no código.
+const DEFAULT_CORS_ORIGINS = ['http://10.10.1.100:10081'];
+const corsOrigins = [
+    ...DEFAULT_CORS_ORIGINS,
+    ...(process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map(o => o.trim())
+        .filter(Boolean)
+];
+
+app.use(cors({
+    origin(origin, callback) {
+        // Permite requests sem Origin (curl, health checks, apps nativos).
+        // CORS é mecanismo de browser; bloquear no-origin não agrega segurança.
+        if (!origin || corsOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(null, false); // sem header ACAO -> browser bloqueia
+    },
+    methods: ['GET', 'POST', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
