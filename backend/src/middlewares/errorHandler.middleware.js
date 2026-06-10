@@ -58,10 +58,13 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
-    // Erro genérico
+    // Erro genérico (inesperado): não vazar err.message em produção.
+    // Mensagens intencionais já são tratadas no branch de err.statusCode acima.
     return res.status(500).json({
         success: false,
-        error: err.message || 'Erro interno do servidor',
+        error: process.env.NODE_ENV === 'production'
+            ? 'Erro interno do servidor'
+            : (err.message || 'Erro interno do servidor'),
         code: ERROR_CODES.INTERNAL_ERROR
     });
 };

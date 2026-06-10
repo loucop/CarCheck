@@ -69,10 +69,14 @@
   ou documentar que o deploy é single-process. Mensagem "15 minutos" está hardcoded — derivar
   de `LOGIN_WINDOW_MS`.
 
-- ⬜ **M3 — Vazamento de detalhes em erros 500**
-  `errorHandler.middleware.js` retorna `err.message` cru no fallback genérico (sem checar
-  `NODE_ENV`). Em produção, mensagens internas podem vazar ao cliente. Padronizar para mensagem
-  genérica quando `NODE_ENV === 'production'`. Confirmar que `NODE_ENV=production` está setado no deploy.
+- ✅ **M3 — Vazamento de detalhes em erros 500** *(concluído em 2026-06-10)*
+  Branch genérico (500 inesperado) em `errorHandler.middleware.js` agora retorna mensagem
+  genérica quando `NODE_ENV === 'production'`, expondo `err.message` apenas em dev (igual ao
+  branch de erros de banco). Branches de `err.statusCode` mantidos — mensagens são hardcoded ou
+  template apenas com números validados (auditado). `.env.example` agora documenta `NODE_ENV`
+  (controla a exposição de detalhe de erro) + as demais vars antes ausentes
+  (`DB_CONNECTION_LIMIT`, `JWT_EXPIRES_IN`, `HOST`).
+  > Lembrete: `NODE_ENV=production` deve estar setado no deploy para o gate valer.
 
 - ⬜ **M4 — JWT em localStorage**
   Token guardado em `localStorage` é roubável via XSS. Considerar cookie `httpOnly`+`SameSite`
