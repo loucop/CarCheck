@@ -82,13 +82,21 @@
   Token guardado em `localStorage` é roubável via XSS. Considerar cookie `httpOnly`+`SameSite`
   (exige ajuste de CSRF). Decisão arquitetural — avaliar custo/benefício.
 
-- ⬜ **M5 — Vulnerabilidades de dependências (npm audit)**
-  `npm audit` reporta **4 vulnerabilidades (2 moderadas, 2 altas)** em `backend/`:
-  - `qs` 6.11.1–6.15.1 (**moderada**, DoS remoto em `qs.stringify`) via `express`/`body-parser` — runtime.
-  - `tar` ≤7.5.10 (**alta**, path traversal / file overwrite na extração) via `@mapbox/node-pre-gyp`
-    (transitiva do `bcrypt`) — exploração só em tempo de build/instalação, não no runtime do servidor.
-  Corrigível com `npm audit fix` (atualiza `express` e a cadeia do `node-pre-gyp`). Validar que
-  nada quebra após o fix. Não rodado ainda para não alterar versões sem revisão.
+- 🔵 **M5 — Vulnerabilidades de dependências (npm audit)** *(parcialmente concluído em 2026-06-10)*
+  Estado inicial: 4 vulnerabilidades (2 moderadas, 2 altas). Após `npm audit fix`: **2 altas restantes**.
+  - ✅ `qs` (**moderada**, DoS remoto em `qs.stringify`) via `express` — **corrigido**: `express`
+    resolvido para `4.22.2` no `package-lock.json`.
+  - ⚠️ `tar` ≤7.5.10 (**alta** ×2, path traversal/file overwrite na extração) via
+    `@mapbox/node-pre-gyp` → `bcrypt`. **Não auto-corrigível** (`npm audit fix` e `--force` não
+    alteram nada — npm sem caminho de fix). É **exploração só em tempo de instalação** (extração do
+    binário nativo do bcrypt), **não alcançável no runtime do servidor** → **risco aceito** por ora.
+    Eliminação real depende de trocar a cadeia nativa — ver **M5-b**.
+
+- ⬜ **M5-b — Avaliar migração `bcrypt` → `bcryptjs`** *(sessão dedicada)*
+  `bcryptjs` é puro-JS: remove `@mapbox/node-pre-gyp` + `tar` (zera as 2 altas restantes do M5) e
+  elimina a dependência de build nativo. API quase drop-in. Requer ajuste em `auth.service.js` e no
+  script `scripts/migrate-passwords.js`, além de teste no servidor (hashes `$2a$`/`$2b$` permanecem
+  compatíveis). Fazer em sessão própria, com validação de login antes/depois.
 
 ---
 
