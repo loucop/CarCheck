@@ -1,21 +1,28 @@
 const jwt = require('jsonwebtoken');
 const response = require('../utils/response');
 const { ERROR_CODES, ROLES } = require('../utils/constants');
+const { TOKEN_COOKIE_NAME } = require('../utils/cookie');
 
 /**
  * Middleware de autenticação JWT
  * Valida token e injeta req.user
+ *
+ * M4 Fase 1 (dual-read): lê o token do cookie httpOnly primeiro; se ausente,
+ * cai para o header Authorization (retrocompat com o frontend atual). O
+ * fallback de header sai na Fase 3, tornando a auth cookie-only.
  */
 const authenticate = (req, res, next) => {
     try {
-        const authHeader = req.headers.authorization;
-        
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return response.unauthorized(res, 'Token não fornecido', ERROR_CODES.TOKEN_INVALID);
+        let token = req.cookies?.[TOKEN_COOKIE_NAME];
+
+        if (!token) {
+            const authHeader = req.headers.authorization;
+            if (!authHeader || !authHeader.startsWith('Bearer ')) {
+                return response.unauthorized(res, 'Token não fornecido', ERROR_CODES.TOKEN_INVALID);
+            }
+            token = authHeader.substring(7);
         }
 
-        const token = authHeader.substring(7);
-        
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
         // Injeta dados do usuário na requisição

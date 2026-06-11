@@ -25,6 +25,29 @@ router.post(
     authController.login
 );
 
+/**
+ * POST /api/logout
+ * Limpa o cookie de sessão. Público: deve funcionar mesmo com token expirado.
+ */
+router.post(
+    '/logout',
+    authController.logout
+);
+
+// ==========================================
+// ROTA DE SESSÃO (Autenticada)
+// ==========================================
+
+/**
+ * GET /api/me
+ * Retorna o usuário da sessão atual (valida o cookie/token).
+ */
+router.get(
+    '/me',
+    authenticate,
+    authController.me
+);
+
 // ==========================================
 // ROTAS DE VEÍCULOS (Autenticadas)
 // ==========================================

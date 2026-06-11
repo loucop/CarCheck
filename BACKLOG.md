@@ -121,7 +121,7 @@
   **Fase 0 — quick win independente**
   - `backend/.env.example` (+ `.env` do servidor): `JWT_EXPIRES_IN=2h` (reduz a janela já agora).
 
-  **Fase 1 — Backend, retrocompatível (frontend atual continua funcionando)**
+  **Fase 1 — Backend, retrocompatível (frontend atual continua funcionando)** ✅ *(implementado em 2026-06-11 — pendente deploy/verificação no servidor)*
   - `backend/package.json` / `package-lock.json`: adicionar **`cookie-parser`**.
   - `backend/index.js`: `app.use(cookieParser())`; adicionar **`credentials: true`** ao `cors({...})`.
   - `backend/src/controllers/auth.controller.js`: em `login`, `res.cookie('token', token, { httpOnly,
@@ -137,6 +137,16 @@
   - `backend/.env.example`: documentar `COOKIE_SECURE` (ou que `NODE_ENV=production` dirige `secure`);
     opcional `COOKIE_DOMAIN` para o público.
   - **→ Deploy + verificar:** login ainda funciona e o cookie passa a ser setado; nada quebra.
+
+  > ✅ **Implementado (2026-06-11):** `cookie-parser` instalado; CORS com `credentials:true` e
+  > allowlist extraída para `src/config/cors.js` (fonte única, compartilhada com o CSRF);
+  > novo `src/utils/cookie.js` (nome do cookie + opções set/clear idênticas + `parseDurationMs`
+  > → `maxAge` derivado de `JWT_EXPIRES_IN`); `login` grava cookie httpOnly (e ainda retorna token
+  > no body); novos `logout` (limpa cookie, público) e `me` (`GET /api/me`, autenticado);
+  > `auth.middleware` lê cookie primeiro, com fallback para header (dual-read); novo
+  > `src/middlewares/csrf.middleware.js` (Origin/Referer vs. allowlist, aplicado global p/ métodos
+  > de escrita). `.env.example`: `COOKIE_SECURE` (dirige `secure`, **não** via NODE_ENV),
+  > `COOKIE_DOMAIN`, `JWT_EXPIRES_IN=2h`. **Pendente:** `npm ci` + deploy + verificação no servidor.
 
   **Fase 2 — Frontend (página por página, cada uma entregável isolada)**
   - `frontend/client/js/config.js`: adicionar helper **`apiFetch(path, opts)`** que injeta

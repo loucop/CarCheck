@@ -1,11 +1,14 @@
 ﻿const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const path = require('path');
 require('dotenv').config();
 
 const routes = require('./src/routes');
+const { corsOrigins } = require('./src/config/cors');
+const { csrfProtection } = require('./src/middlewares/csrf.middleware');
 const { errorHandler, notFoundHandler } = require('./src/middlewares/errorHandler.middleware');
 
 const app = express();
@@ -65,18 +68,11 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
-// CORS — allowlist de origens. O host LAN é sempre permitido; origens
-// adicionais (ex.: domínio Cloudflare em produção pública) entram via a
-// variável de ambiente CORS_ORIGINS (separadas por vírgula), sem mexer no código.
-const DEFAULT_CORS_ORIGINS = ['http://10.10.1.100:10081'];
-const corsOrigins = [
-    ...DEFAULT_CORS_ORIGINS,
-    ...(process.env.CORS_ORIGINS || '')
-        .split(',')
-        .map(o => o.trim())
-        .filter(Boolean)
-];
-
+// CORS — allowlist de origens definida em src/config/cors.js (fonte única,
+// compartilhada com o middleware de CSRF). O host LAN é sempre permitido;
+// origens adicionais entram via a env CORS_ORIGINS, sem mexer no código.
+// credentials: true é obrigatório para o cookie httpOnly de sessão (M4)
+// trafegar em requests cross-origin (frontend :10081 -> backend :3000).
 app.use(cors({
     origin(origin, callback) {
         // Permite requests sem Origin (curl, health checks, apps nativos).
@@ -86,10 +82,16 @@ app.use(cors({
         }
         return callback(null, false); // sem header ACAO -> browser bloqueia
     },
+    credentials: true,
     methods: ['GET', 'POST', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '50mb' }));
+app.use(cookieParser());
+// CSRF: checagem de Origin/Referer em métodos que alteram estado. Aplicado
+// globalmente (métodos seguros são ignorados pelo próprio middleware), antes
+// das rotas, cobrindo todas as rotas de escrita de uma vez.
+app.use(csrfProtection);
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==========================================
