@@ -297,9 +297,9 @@
     <script>
         // ─── Auth ──────────────────────────────────────────────────────
         (function () {
-            const token   = localStorage.getItem('token');
+            // M4 Fase 2: a sessão vive no cookie httpOnly; o guard checa `usuario` + nível.
             const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
-            if (!token || !usuario || usuario.nivel_acesso !== 'admin') {
+            if (!usuario || usuario.nivel_acesso !== 'admin') {
                 window.location.href = 'login.html';
             }
         })();
@@ -308,20 +308,11 @@
         document.addEventListener('DOMContentLoaded', carregarFuncionarios);
 
         async function carregarFuncionarios() {
-            const token = localStorage.getItem('token');
             const corpo = document.getElementById('corpo-tabela');
             corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Carregando...</td></tr>';
 
             try {
-                const res = await fetch(`${CONFIG.API_BASE_URL}/admin/funcionarios`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (res.status === 401) {
-                    localStorage.clear();
-                    window.location.href = 'login.html';
-                    return;
-                }
+                const res = await apiFetch(`/admin/funcionarios`);
 
                 if (!res.ok) {
                     corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Erro ao carregar dados.</td></tr>';
@@ -350,6 +341,7 @@
                 `).join('');
 
             } catch (err) {
+                if (err && err.isAuthRedirect) return;
                 corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Erro de comunicação com o servidor.</td></tr>';
             }
         }
@@ -395,22 +387,11 @@
             const payload = { nome, cpf, matricula, senha, nivel_acesso };
             if (nivel_acesso !== 'admin') payload.coligada = coligada;
 
-            const token = localStorage.getItem('token');
             try {
-                const res = await fetch(`${CONFIG.API_BASE_URL}/admin/funcionarios`, {
+                const res = await apiFetch(`/admin/funcionarios`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
                     body: JSON.stringify(payload)
                 });
-
-                if (res.status === 401) {
-                    localStorage.clear();
-                    window.location.href = 'login.html';
-                    return;
-                }
 
                 const json = await res.json();
 
@@ -423,6 +404,7 @@
                 await carregarFuncionarios();
 
             } catch (err) {
+                if (err && err.isAuthRedirect) return;
                 alert('Erro de comunicação com o servidor.');
             }
         }

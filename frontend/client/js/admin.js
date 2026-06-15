@@ -18,10 +18,10 @@ function escHtml(str) {
 }
 
 function verificarSeguranca() {
+    // M4 Fase 2: a sessão vive no cookie httpOnly; o guard checa `usuario` + nível.
     const usuario = JSON.parse(localStorage.getItem("usuario"));
-    const token = localStorage.getItem("token");
 
-    if (!usuario || !token || usuario.nivel_acesso !== "admin") {
+    if (!usuario || usuario.nivel_acesso !== "admin") {
         console.warn("[ACESSO NEGADO] Redirecionando...");
         window.location.href = "login.html";
         return false;
@@ -31,17 +31,7 @@ function verificarSeguranca() {
 
 async function carregarFuncionarios() {
     try {
-        const token = localStorage.getItem("token");
-
-        const resposta = await fetch(`${CONFIG.API_BASE_URL}/admin/funcionarios`, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-
-        if (resposta.status === 401) {
-            localStorage.clear();
-            window.location.href = "login.html";
-            return;
-        }
+        const resposta = await apiFetch("/admin/funcionarios");
 
         if (!resposta.ok) throw new Error("Erro ao carregar funcionários");
 
@@ -49,6 +39,7 @@ async function carregarFuncionarios() {
         funcionariosLista = resultado.data || resultado;
         renderizarFiltroFuncionarios();
     } catch (erro) {
+        if (erro && erro.isAuthRedirect) return;
         console.error("[ERRO] Falha ao carregar funcionários:", erro);
     }
 }
@@ -74,25 +65,16 @@ async function carregarRelatorios(funcionarioId = null) {
     corpoTabela.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Carregando dados...</td></tr>';
 
     try {
-        const token = localStorage.getItem("token");
-        let url = `${CONFIG.API_BASE_URL}/admin/relatorio`;
+        let path = `/admin/relatorio`;
 
         if (funcionarioId) {
-            url += `?funcionario_id=${funcionarioId}`;
+            path += `?funcionario_id=${funcionarioId}`;
             filtroAtivo = funcionarioId;
         } else {
             filtroAtivo = null;
         }
 
-        const resposta = await fetch(url, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-
-        if (resposta.status === 401) {
-            localStorage.clear();
-            window.location.href = "login.html";
-            return;
-        }
+        const resposta = await apiFetch(path);
 
         if (!resposta.ok) throw new Error(`Erro HTTP: ${resposta.status}`);
 
@@ -166,6 +148,7 @@ async function carregarRelatorios(funcionarioId = null) {
         window.relatoriosCache = dados;
 
     } catch (erro) {
+        if (erro && erro.isAuthRedirect) return;
         console.error("[ERRO] Falha na carga de relatórios:", erro);
         corpoTabela.innerHTML = `<tr><td colspan="5" style="color:#ef4444; text-align:center; padding: 20px;">ERRO: ${erro.message}</td></tr>`;
     }
@@ -287,17 +270,7 @@ async function verHistoricoVeiculo(event, veiculoId, placa) {
     modal.style.display = "flex";
 
     try {
-        const token = localStorage.getItem("token");
-
-        const resposta = await fetch(`${CONFIG.API_BASE_URL}/veiculos/${veiculoId}/historico`, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-
-        if (resposta.status === 401) {
-            localStorage.clear();
-            window.location.href = "login.html";
-            return;
-        }
+        const resposta = await apiFetch(`/veiculos/${veiculoId}/historico`);
 
         if (!resposta.ok) throw new Error("Erro ao carregar histórico");
 
@@ -360,6 +333,7 @@ async function verHistoricoVeiculo(event, veiculoId, placa) {
         container.innerHTML = historicoHTML;
 
     } catch (erro) {
+        if (erro && erro.isAuthRedirect) return;
         console.error("[ERRO] Falha ao carregar histórico:", erro);
         container.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 40px;">ERRO ao carregar histórico do veículo</p>';
     }
@@ -398,8 +372,6 @@ document.addEventListener("DOMContentLoaded", () => {
     formFunc.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        const token = localStorage.getItem("token");
-
         const dados = {
             matricula: document.getElementById("cad_id").value,
             nome: document.getElementById("cad_nome").value,
@@ -409,20 +381,10 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         try {
-            const res = await fetch(`${CONFIG.API_BASE_URL}/admin/funcionarios`, {
+            const res = await apiFetch(`/admin/funcionarios`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
                 body: JSON.stringify(dados),
             });
-
-            if (res.status === 401) {
-                localStorage.clear();
-                window.location.href = "login.html";
-                return;
-            }
 
             const resultado = await res.json();
 
@@ -435,6 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert("ERRO no cadastro: " + (resultado.error || "Verifique os dados."));
             }
         } catch (err) {
+            if (err && err.isAuthRedirect) return;
             console.error("[ERRO] Falha na requisição:", err);
             alert("ERRO: Falha crítica de conexão com o servidor.");
         }

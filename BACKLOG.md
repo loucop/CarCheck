@@ -179,7 +179,7 @@
     por presença de `usuario` (ou `GET /api/me`).
   - **→ Verificar fluxo completo** (login → menu → seleção → checklist → bdv → admin → logout).
 
-  > 🚧 **Em andamento (2026-06-15):** base + **fluxo do motorista migrados**.
+  > ✅ **Fase 2 concluída (2026-06-15):** todo o frontend migrado para a sessão por cookie httpOnly.
   > - **Base:** `config.js` (helper `apiFetch` com `credentials:'include'`; em 401 limpa estado,
   >   redireciona ao login e lança Error com `isAuthRedirect` p/ o catch do chamador pular alertas
   >   duplicados) e `auth.js` (login com `credentials:'include'`, **removido `setItem('token')`**).
@@ -191,14 +191,23 @@
   >   `bdv/ativo` e `POST /checklist` via `apiFetch`; 401 manual removido; flow lock preservado.
   > - **`bdv.html`:** 16 sites migrados — abrir/encerrar BDV, paradas (saída/chegada), KM e estados
   >   404→abrir preservados; `apiFetch` em todas as chamadas; 401 manual removido.
-  > - **Páginas restantes (fluxo admin):** `admin.js`, `admin-bdv.html`, `admin-funcionarios.html`,
-  >   `admin-dashboard.html` (esta só troca o guard `token`→`usuario`; não tem fetch).
+  > - **Fluxo admin (`admin.js`, `admin.html`, `admin-bdv.html`, `admin-funcionarios.html`,
+  >   `admin-dashboard.html`):** guards `token`→`usuario`+nível; relatórios, histórico, CRUD de
+  >   funcionários e contagem de paradas via `apiFetch`; 401 manual removido; supressão `isAuthRedirect`
+  >   nos catches. Navegação admin padronizada no **hub `admin-dashboard.html`** (botões "Voltar" de
+  >   `admin.html` e `admin-bdv.html` apontam ao painel).
+  > - **Pendente de verificação no servidor** (deploy manual): rodar o fluxo completo
+  >   (login → menu → seleção → checklist → bdv → admin → logout) confirmando que nada usa mais o
+  >   header `Authorization` e que o cookie carrega a sessão.
 
-  **Fase 3 — Limpeza do backend (após todo o frontend migrado — passo irreversível)**
+  **Fase 3 — Limpeza do backend (após todo o frontend migrado — passo irreversível)** — ⬅️ **único passo restante do M4**
   - `backend/src/middlewares/auth.middleware.js`: **remover o fallback de header `Authorization`**
     (cookie-only).
   - `backend/src/controllers/auth.controller.js`: **parar de retornar `token` no body** do login.
   - `backend/.env.example` / `.env`: confirmar `JWT_EXPIRES_IN=2h` alinhado ao `maxAge` do cookie.
+  > ⚠️ **Pré-requisito (passo irreversível):** só executar **após** a verificação da Fase 2 no
+  > servidor (deploy manual) confirmar que nenhum cliente ainda depende do header/token no body —
+  > caso contrário, sessões em páginas não atualizadas quebram.
 
   **Ordem:** Fase 0 → Fase 1 (cookie-parser+CORS → middleware dual-read → controller set/clear → rotas
   logout/me → CSRF) → deploy/verificar → Fase 2 (`config.js` primeiro, depois `auth.js`, depois demais

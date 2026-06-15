@@ -105,9 +105,9 @@
 
     <script>
       (function () {
-        const token   = localStorage.getItem('token');
+        // M4 Fase 2: a sessão vive no cookie httpOnly; o guard checa `usuario` + nível.
         const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
-        if (!token || !usuario || usuario.nivel_acesso !== 'admin') {
+        if (!usuario || usuario.nivel_acesso !== 'admin') {
           window.location.href = 'login.html';
           return;
         }
