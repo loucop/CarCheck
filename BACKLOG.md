@@ -45,6 +45,23 @@
   > (ex.: `CORS_ORIGINS=https://carcheck.seudominio.com`) no `.env` de produção, senão o
   > frontend público será bloqueado pelo navegador.
 
+- ⬜ **A3 — Submissão confia em `req.body.matricula` em vez de `req.user.matricula` (IDOR/spoof de identidade)**
+  `checklist.service.js::createChecklist` recebe `req.body` direto do controller
+  (`checklist.controller.js`: `createChecklist(conn, req.body)`) e usa **`data.matricula`** tanto no
+  guard de duplicidade (`findPendingTodayByMatricula`) quanto no `INSERT` do checklist. A matrícula
+  **não** é derivada do JWT — qualquer cliente autenticado pode enviar a matrícula de **outro
+  motorista** no corpo e registrar checklist sob a identidade alheia (a camada Zod valida o formato,
+  não a posse). O frontend preenche `matricula` a partir de `localStorage.usuario`, mas o servidor
+  confia no que chega no body.
+  - **Correção (não aplicar ainda):** o servidor deve **derivar a matrícula de `req.user`** (do token,
+    populado pelo `auth.middleware`) e **ignorar** qualquer `matricula` no corpo — ou, no mínimo,
+    rejeitar se `req.body.matricula !== req.user.matricula`.
+  - **Mesmo audit nos endpoints de BDV:** `bdv.service.js` / `bdv.controller.js` (abertura de BDV,
+    paradas, encerramento) seguem o mesmo padrão de passar `req.body` adiante — confirmar se a
+    `matricula` (e o `veiculo_id`/ownership do BDV) também vêm do corpo e migrar para `req.user`.
+  - Risco real de **vazamento/atribuição cruzada entre motoristas**; agrava-se sob multi-tenancy (M6),
+    onde a matrícula precisa ser escopada por tenant. Relaciona-se a M4 (sessão via cookie) e M6.
+
 ---
 
 ## 🟡 Médio
