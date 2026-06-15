@@ -45,7 +45,45 @@
   > (ex.: `CORS_ORIGINS=https://carcheck.seudominio.com`) no `.env` de produção, senão o
   > frontend público será bloqueado pelo navegador.
 
-- ⬜ **A3 — Submissão confia em `req.body.matricula` em vez de `req.user.matricula` (IDOR/spoof de identidade)**
+- 🚧 **A3 — Submissão confia em `req.body.matricula` em vez de `req.user.matricula` (IDOR/spoof de identidade)** *(correção implementada no working tree — NÃO commitada, NÃO deployada)*
+  > ⚠️ **AÇÃO NA PRÓXIMA SESSÃO — a correção do A3 está apenas no working tree (não commitada).**
+  > Não há acesso ao servidor deste ambiente; o deploy é manual. Executar **nesta ordem**:
+  > 1. **Deploy dos 4 arquivos backend** para o servidor:
+  >    - `backend/src/middlewares/validate.middleware.js` (remove `matricula` do schema `createChecklist`)
+  >    - `backend/src/controllers/checklist.controller.js` (injeta `matricula: req.user.matricula`)
+  >    - `backend/src/controllers/bdv.controller.js` (passa `req.user` para `getBDV`)
+  >    - `backend/src/services/bdv.service.js` (guard de ownership role-aware em `getBDV`)
+  > 2. **Reiniciar o Node** (`npm ci` se necessário + restart do processo backend).
+  > 3. **Rodar os 4 testes de fronteira de identidade** (todos devem passar):
+  >    - **T1 — spoof de checklist:** logado como motorista A, `POST /checklist` com `matricula: <B>` no
+  >      corpo → o checklist é gravado sob **A** (JWT), nunca B. (campo do body ignorado)
+  >    - **T2 — guard de duplicidade usa o JWT:** motorista A com checklist pendente do dia → novo
+  >      `POST /checklist` (com qualquer `matricula` no corpo) → **409** baseado em A, não no body.
+  >    - **T3 — IDOR de leitura de BDV:** motorista A faz `GET /bdv/:id` de um BDV do motorista B → **403**;
+  >      `GET /bdv/:id` do próprio BDV de A → **200**.
+  >    - **T4 — admin preservado:** logado como admin, `GET /bdv/:id` de qualquer BDV → **200** e o
+  >      relatório `admin-bdv.html` carrega as contagens de paradas (que chamam `/bdv/:id` por linha).
+  > 4. **Só então commitar** os 4 arquivos backend (esta nota do BACKLOG já estará commitada à parte).
+
+  > ✅ **Auditoria + correção (2026-06-15):**
+  > - **#1 `POST /checklist` (vuln confirmada):** `matricula` removida do schema Zod `createChecklist`;
+  >   o controller injeta `{ ...req.body, matricula: req.user.matricula }`. O guard de duplicidade
+  >   (`findPendingTodayByMatricula`) e o `INSERT` agora usam o valor do JWT.
+  > - **#7 `GET /bdv/:id` (BOLA/IDOR de leitura, achado na auditoria):** `bdv.service.getBDV` agora
+  >   recebe o solicitante e exige `nivel_acesso === 'admin'` **OU** `bdv.matricula === req.user.matricula`,
+  >   senão 403. O relatório admin (`/admin/bdv` → `admin-bdv.html`) continua funcionando (role admin);
+  >   o motorista lê apenas o próprio BDV.
+  > - **Escritas de BDV já estavam corretas:** `open`/`paradas`/`encerrar` já usavam `req.user.matricula`
+  >   e o service já barrava `bdv.matricula !== matricula` com 403 — nenhuma mudança necessária.
+  > - **#8 `GET /veiculos/:id/historico` — aceito por ora:** qualquer usuário autenticado lê o histórico
+  >   de inspeções de **qualquer** veículo (dado de frota, não de usuário). **Aceito por design** no
+  >   modelo single-tenant atual; adicionar object-level authorization se/quando o produto for
+  >   multi-tenant (M6) ou se o histórico passar a conter dado sensível por motorista.
+  > - **Nota M6:** `POST /admin/funcionarios` recebe `coligada`/`nivel_acesso` do body (dado de criação,
+  >   admin global — ok hoje). Sob multi-tenancy, escopar `coligada` ao tenant do admin; `coligada` ainda
+  >   **não** está no JWT, então isso exigirá incluí-la no token. Relaciona-se a M6.
+
+  **Achado original (referência):**
   `checklist.service.js::createChecklist` recebe `req.body` direto do controller
   (`checklist.controller.js`: `createChecklist(conn, req.body)`) e usa **`data.matricula`** tanto no
   guard de duplicidade (`findPendingTodayByMatricula`) quanto no `INSERT` do checklist. A matrícula
