@@ -14,6 +14,7 @@ document.getElementById("loginForm")?.addEventListener("submit", async (e) => {
         const resposta = await fetch(`${CONFIG.API_BASE_URL}/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "include", // recebe o cookie httpOnly de sessão (M4)
             body: JSON.stringify({ matricula, senha }),
         });
 
@@ -22,8 +23,9 @@ document.getElementById("loginForm")?.addEventListener("submit", async (e) => {
         if (dados.success) {
             console.log(`Sucesso! Bem-vindo, ${dados.data.user.nome}`);
 
-            // Salva token JWT e dados do usuário
-            localStorage.setItem("token", dados.data.token);
+            // M4 Fase 2: a sessão agora vive no cookie httpOnly (setado pelo
+            // backend na resposta do login). Não guardamos mais o token em
+            // localStorage; apenas os dados do usuário p/ a UI (nome, nível).
             localStorage.setItem("usuario", JSON.stringify(dados.data.user));
 
             window.location.href = "menu.html";

@@ -162,6 +162,13 @@
     por presença de `usuario` (ou `GET /api/me`).
   - **→ Verificar fluxo completo** (login → menu → seleção → checklist → bdv → admin → logout).
 
+  > 🚧 **Em andamento — primeira fatia (2026-06-15):** migrados `config.js` (helper `apiFetch`
+  > com `credentials:'include'` + tratamento central de 401), `auth.js` (login com
+  > `credentials:'include'`, **removido `setItem('token')`**) e **`menu.html`** (guard por presença
+  > de `usuario`, `bdv/ativo` via `apiFetch` no load e no `pageshow`, `fazerLogout` agora chama
+  > `POST /api/logout`). **Páginas restantes:** `checklist.html`, `bdv.html`, `admin-bdv.html`,
+  > `admin-funcionarios.html`, `admin-dashboard.html` e os JS `admin.js`, `checklist.js`, `frota.js`.
+
   **Fase 3 — Limpeza do backend (após todo o frontend migrado — passo irreversível)**
   - `backend/src/middlewares/auth.middleware.js`: **remover o fallback de header `Authorization`**
     (cookie-only).

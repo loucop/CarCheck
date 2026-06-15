@@ -144,14 +144,16 @@
       </button>
     </div>
 
+    <script src="../js/config.js"></script>
     <script>
       // LOGICA DE INICIALIZAÇÃO E SEGURANÇA v3.0
       document.addEventListener("DOMContentLoaded", async () => {
           const dadosSessao = localStorage.getItem("usuario");
-          const token = localStorage.getItem("token");
 
-          // Validação de Sessão
-          if (!dadosSessao || !token) {
+          // M4 Fase 2: a sessão vive no cookie httpOnly; o guard verifica apenas
+          // a presença de `usuario` (UI). A validade real do token é checada no
+          // backend — apiFetch redireciona ao login em caso de 401.
+          if (!dadosSessao) {
               console.warn("[AUTH] Sessão não encontrada. Redirecionando...");
               window.location.href = "login.html";
               return;
@@ -176,14 +178,12 @@
 
           if (usuario.nivel_acesso === "motorista") {
               try {
-                  const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
-                      headers: { "Authorization": `Bearer ${token}` }
-                  });
+                  const res = await apiFetch("/bdv/ativo");
                   if (res.ok) {
                       window.location.href = "bdv.html";
                   }
               } catch (e) {
-                  // network error — stay on menu
+                  // erro de rede (ou 401 já tratado por apiFetch) — fica no menu
               }
           }
       });
@@ -200,24 +200,30 @@
       // Back-button guard: re-run BDV active check for motorista
       window.addEventListener('pageshow', async () => {
           const dadosSessao = localStorage.getItem('usuario');
-          const token       = localStorage.getItem('token');
-          if (!dadosSessao || !token) return;
+          if (!dadosSessao) return;
           const usuario = JSON.parse(dadosSessao);
           if (usuario.nivel_acesso === 'motorista') {
               try {
-                  const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
-                      headers: { 'Authorization': `Bearer ${token}` }
-                  });
+                  const res = await apiFetch('/bdv/ativo');
                   if (res.ok) {
                       window.location.href = 'bdv.html';
                   }
-              } catch (e) { /* network error — stay */ }
+              } catch (e) { /* erro de rede / 401 já tratado — fica no menu */ }
           }
       });
 
       // FINALIZAÇÃO DE SESSÃO
-      function fazerLogout() {
-          if (confirm("Deseja realmente encerrar a sessão operacional?")) {
+      async function fazerLogout() {
+          if (!confirm("Deseja realmente encerrar a sessão operacional?")) return;
+
+          // M4 Fase 2: avisa o backend p/ limpar o cookie httpOnly de sessão.
+          // Se a rede falhar, ainda assim limpamos o estado local e voltamos ao
+          // login — um erro de rede não pode prender o usuário na sessão.
+          try {
+              await apiFetch("/logout", { method: "POST" });
+          } catch (e) {
+              console.warn("[AUTH] Falha ao encerrar sessão no servidor:", e);
+          } finally {
               localStorage.clear();
               window.location.href = "login.html";
           }
