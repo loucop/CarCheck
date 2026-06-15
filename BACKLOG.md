@@ -100,6 +100,67 @@
   - Risco real de **vazamento/atribuição cruzada entre motoristas**; agrava-se sob multi-tenancy (M6),
     onde a matrícula precisa ser escopada por tenant. Relaciona-se a M4 (sessão via cookie) e M6.
 
+- ⬜ **A4 — Endurecimento de validação de input (Zod) — limites de tamanho e schemas frouxos**
+  Auditoria de validação/injeção em 2026-06-15. Camada Zod (`validate.middleware.js`) sem caps de
+  tamanho e com schemas permissivos. **Sem fix ainda.**
+  - **H2 (alto) — sem `.max()` + `express.json({ limit: '50mb' })` (`index.js:89`) = DoS/amplificação
+    de armazenamento por usuário autenticado.** Nenhum schema limita comprimento de string; os campos
+    controlados pelo motorista caem em `LONGTEXT`. Piores: `createChecklist.mapa_avaria_base64`
+    (`z.string().optional()`, sem cap), `itens_status` (sem cap) e os textos livres `local_origem`,
+    `local_destino`, `observacao`, `combustivel_retorno`. Um motorista pode empurrar ~50 MB por
+    requisição direto no banco. **Ação:** adicionar `.max()` nesses campos; baixar o limite do
+    `express.json` **ou** escopar o `50mb` somente à rota de checklist (que carrega o PNG base64).
+  - **M1 — `itens_status: z.union([z.string().min(1), z.record(z.any())])` permissivo demais:** aceita
+    qualquer string OU objeto de chaves/valores arbitrários; sem validação da forma esperada
+    `{ item: { status, obs } }`. Render no admin escapa via `escHtml` (sem XSS/crash), mas o contrato
+    de dados não é imposto. **Ação:** validar a forma (ex.: `z.record(z.object({ status, obs }))`).
+  - **M2 — `mapa_avaria_base64` sem validação de formato no schema:** formato só é checado depois
+    (service `startsWith('data:image/')` + regex no render). **Ação:** validar data-URI/base64 no Zod.
+  - **M3 — campos de data/hora como `z.string()` cru:** `addParada.hora_saida`, `closeParada.hora_chegada`,
+    `relatorioBDV.data_inicio`/`data_fim` sem formato ISO/datetime. Parametrizados (sem injeção), mas
+    valores malformados geram resultado silenciosamente errado em `data_abertura >= ?`. **Ação:** validar
+    formato (ex.: `z.coerce.date()` ou regex ISO).
+  - **M4 — `coligada` inconsistente:** enum `['angels','cemax']` em `createFuncionario`/`openBDV`, mas
+    `z.string().optional()` livre em `relatorioBDV`. **Ação:** unificar no enum.
+  - **L1 — nenhum schema usa `.strict()`:** chaves desconhecidas são **descartadas** (default do Zod),
+    não rejeitadas (overposting tolerado). ⚠️ **Tradeoff:** a correção do **A3 depende desse descarte**
+    (um `matricula` no body é dropado) — aplicar `.strict()` passaria a **400** essas requisições.
+    Decidir por schema.
+  - **L2 — sem `.max()` em `login`/`createFuncionario`:** `senha` sem teto (bcrypt lê só 72 bytes →
+    trabalho desperdiçado, não quebra); `nome`/`matricula` sem teto podem estourar a coluna do banco
+    (500 em vez de 400 limpo).
+  - **L3 — `migrate-passwords.js` carrega todas as linhas sem `WHERE`** — ok na escala atual; revisitar
+    se `funcionarios` crescer. (O problema grave do script está em **A5**.)
+
+- ⬜ **A5 — `scripts/migrate-passwords.js` está quebrado e é destrutivo de dados — NÃO RODAR**
+  Achado na auditoria de 2026-06-15. **Não executar o script até ser reconciliado com o schema real.**
+  - **Colunas/PK erradas:** o script usa `SELECT id, nome, senha_hash FROM funcionarios` e
+    `UPDATE ... SET senha_hash = ? WHERE id = ?`. Mas, pelo schema (CLAUDE.md) e por **todos** os
+    repositórios, a PK é **`matricula`** (não há `id`) e a coluna de senha é **`senha`** (não há
+    `senha_hash`) — `funcionario.repository.js` lê/grava `senha`, e o login autentica contra
+    `funcionario.senha`.
+    - Melhor caso: lança `Unknown column 'id'/'senha_hash'` e não faz nada (falha rápido).
+    - Pior caso: se existir uma coluna `senha_hash` obsoleta, migra o **campo errado** e deixa o `senha`
+      real intacto — divergência silenciosa e irreversível.
+  - **Detecção só de `$2b$`:** `func.senha_hash.startsWith('$2b$')` ignora `$2a$` e `$2y$` (também bcrypt).
+    Qualquer hash desses seria tratado como texto plano e **re-hasheado**, destruindo a senha de forma
+    irreversível.
+  - **Sem null-guard:** `.startsWith()` em coluna nula/vazia lança `TypeError` no meio da execução.
+  - **Sem transação / sem dry-run / sem backup:** operação destrutiva e irreversível (texto plano →
+    bcrypt); falha no meio deixa a tabela parcialmente migrada.
+  - **Correção (não aplicar ainda):** reconciliar nomes de coluna (`matricula`/`senha`); ampliar a
+    checagem de prefixo para `$2[aby]$`; adicionar null-guard; envolver em transação + flag `--dry-run`;
+    **verificar o schema vivo antes de rodar de novo.** Relaciona-se a M5-b (`bcrypt`→`bcryptjs`).
+
+- ✅ **Auditoria de superfície de injeção SQL — limpa** *(2026-06-15)*
+  Revisados os **4 repositórios** (`bdv`, `checklist`, `funcionario`, `veiculo`). **Todas as queries
+  usam placeholders `?` com array de parâmetros — zero interpolação de input do usuário no SQL.** Os
+  dois construtores dinâmicos são seguros: `bdv.repository.js::findAllBDV` e
+  `checklist.repository.js::findRelatorio` concatenam apenas **fragmentos SQL constantes**
+  (`'b.matricula = ?'`, `' LIMIT ?'`) e empurram os valores para `params` (com `Number()` no
+  `limit`/`offset` do `findAllBDV`). Sem template literals com input interpolado e sem caminho de
+  injeção de segunda ordem. A regra "só repositórios tocam SQL" (CLAUDE.md) está sendo mantida.
+
 ---
 
 ## 🟡 Médio
