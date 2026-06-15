@@ -165,8 +165,8 @@ function inicializarPagina() {
 async function finalizarRelatorio(event) {
   if (event) event.preventDefault();
 
-  const token = localStorage.getItem("token");
-  if (!token) {
+  // M4 Fase 2: guard por presença de `usuario`; a sessão real vive no cookie.
+  if (!localStorage.getItem("usuario")) {
     alert("Sessão expirada. Faça login novamente.");
     window.location.href = "login.html";
     return;
@@ -214,23 +214,14 @@ async function finalizarRelatorio(event) {
   };
 
   try {
-    const resposta = await fetch(`${CONFIG.API_BASE_URL}/checklist`, {
+    // M4 Fase 2: cookie httpOnly via apiFetch (Content-Type JSON é padrão);
+    // 401 é tratado centralmente por apiFetch (limpa estado + redireciona).
+    const resposta = await apiFetch("/checklist", {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
       body: JSON.stringify(payload),
     });
 
     const resultado = await resposta.json();
-
-    if (resposta.status === 401) {
-      alert("Sessão expirada. Faça login novamente.");
-      localStorage.clear();
-      window.location.href = "login.html";
-      return;
-    }
 
     if (resposta.ok) {
       alert("✅ Checklist registrado com sucesso!");
@@ -243,6 +234,8 @@ async function finalizarRelatorio(event) {
       alert(`❌ Erro: ${resultado.error || JSON.stringify(resultado)}`);
     }
   } catch (erro) {
+    // 401 já tratado por apiFetch (redirect ao login em curso) — não alertar.
+    if (erro && erro.isAuthRedirect) return;
     console.error("Erro de rede:", erro);
     alert("❌ Erro de comunicação com o servidor.");
   }

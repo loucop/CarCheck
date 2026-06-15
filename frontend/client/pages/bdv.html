@@ -426,9 +426,9 @@
 
       // ─── Auth + Init ───────────────────────────────────────────────
       document.addEventListener('DOMContentLoaded', () => {
-        const token = localStorage.getItem('token');
+        // M4 Fase 2: a sessão vive no cookie httpOnly; o guard checa só `usuario`.
         const usuario = localStorage.getItem('usuario');
-        if (!token || !usuario) {
+        if (!usuario) {
           window.location.href = 'login.html';
           return;
         }
@@ -461,18 +461,9 @@
       // The menu redirect only happens after a BDV is successfully closed
       // (see encerrarViagem).
       window.addEventListener('pageshow', async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
+        if (!localStorage.getItem('usuario')) return;
         try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-
-          if (res.status === 401) {
-            localStorage.clear();
-            window.location.href = 'login.html';
-            return;
-          }
+          const res = await apiFetch('/bdv/ativo');
 
           if (res.status === 404) {
             await preencherKmInicial();
@@ -486,7 +477,7 @@
             preencherAndamento();
             mostrarEstado('andamento');
           }
-        } catch (e) { /* network error — stay */ }
+        } catch (e) { /* erro de rede (ou 401 já tratado por apiFetch) — fica */ }
       });
 
       // ─── State management ──────────────────────────────────────────
@@ -501,13 +492,10 @@
 
       // ─── API: pré-preencher KM inicial ────────────────────────────
       async function preencherKmInicial() {
-        const token     = localStorage.getItem('token');
         const veiculoId = String(localStorage.getItem('veiculo_id') || '');
         if (!veiculoId) return;
         try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/veiculos`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const res = await apiFetch('/veiculos');
           if (!res.ok) return;
           const json = await res.json();
           const veiculo = (json.data || []).find(v => String(v.id) === veiculoId);
@@ -515,6 +503,7 @@
             document.getElementById('km-inicial').value = veiculo.km_atual;
           }
         } catch (err) {
+          if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao buscar KM atual do veículo:', err);
         }
       }
@@ -522,17 +511,8 @@
       // ─── API: verificar BDV ativo ──────────────────────────────────
       async function verificarBDVAtivo() {
         mostrarEstado('loading');
-        const token = localStorage.getItem('token');
         try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-
-          if (res.status === 401) {
-            localStorage.clear();
-            window.location.href = 'login.html';
-            return;
-          }
+          const res = await apiFetch('/bdv/ativo');
 
           if (res.status === 404) {
             await preencherKmInicial();
@@ -550,6 +530,7 @@
 
           mostrarEstado('abrir');
         } catch (err) {
+          if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao verificar BDV ativo:', err);
           mostrarEstado('abrir');
         }
@@ -608,14 +589,9 @@
         if (!kmInicial) { alert('Informe o KM inicial.'); return; }
         if (!coligada)  { alert('Selecione a coligada.'); return; }
 
-        const token = localStorage.getItem('token');
         try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv`, {
+          const res = await apiFetch('/bdv', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
               veiculo_id: veiculoId,
               coligada,
@@ -624,11 +600,6 @@
           });
 
           const json = await res.json();
-          if (res.status === 401) {
-            localStorage.clear();
-            window.location.href = 'login.html';
-            return;
-          }
           if (!res.ok) {
             alert(`Erro: ${json.error || 'Não foi possível iniciar a viagem.'}`);
             return;
@@ -645,6 +616,7 @@
           preencherAndamento();
           mostrarEstado('andamento');
         } catch (err) {
+          if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao iniciar viagem:', err);
           alert('Erro de comunicação com o servidor.');
         }
@@ -675,14 +647,9 @@
         if (!horaSaida)  { alert('Informe a hora de saída.'); return; }
         if (!km)         { alert('Informe o KM atual.'); return; }
 
-        const token = localStorage.getItem('token');
         try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvAtivo.id}/paradas`, {
+          const res = await apiFetch(`/bdv/${bdvAtivo.id}/paradas`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
               local_saida:   localSaida,
               hora_saida:    horaSaida,
@@ -701,6 +668,7 @@
           fecharModalParada();
           await recarregarBDV();
         } catch (err) {
+          if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao salvar parada:', err);
           alert('Erro de comunicação com o servidor.');
         }
@@ -729,14 +697,9 @@
         if (!localChegada) { alert('Informe o local de chegada.'); return; }
         if (!horaChegada)  { alert('Informe a hora de chegada.'); return; }
 
-        const token = localStorage.getItem('token');
         try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvAtivo.id}/paradas/${paradaEmFechamento}`, {
+          const res = await apiFetch(`/bdv/${bdvAtivo.id}/paradas/${paradaEmFechamento}`, {
             method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
               local_chegada: localChegada,
               hora_chegada:  horaChegada,
@@ -754,6 +717,7 @@
           fecharModalChegada();
           await recarregarBDV();
         } catch (err) {
+          if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao registrar chegada:', err);
           alert('Erro de comunicação com o servidor.');
         }
@@ -785,14 +749,9 @@
 
         if (!confirm('Confirmar encerramento da viagem?')) return;
 
-        const token = localStorage.getItem('token');
         try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvAtivo.id}/encerrar`, {
+          const res = await apiFetch(`/bdv/${bdvAtivo.id}/encerrar`, {
             method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
               km_final:            parseInt(kmFinal),
               combustivel_retorno: combustivel,
@@ -810,6 +769,7 @@
           bdvAtivo = null;
           window.location.href = 'menu.html';
         } catch (err) {
+          if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao encerrar viagem:', err);
           alert('Erro de comunicação com o servidor.');
         }
@@ -817,17 +777,15 @@
 
       // ─── Helpers ───────────────────────────────────────────────────
       async function recarregarBDV() {
-        const token = localStorage.getItem('token');
         try {
-          const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/${bdvAtivo.id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const res = await apiFetch(`/bdv/${bdvAtivo.id}`);
           if (res.ok) {
             const json = await res.json();
             bdvAtivo = json.data;
             preencherAndamento();
           }
         } catch (err) {
+          if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao recarregar BDV:', err);
         }
       }

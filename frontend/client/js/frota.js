@@ -4,27 +4,16 @@
 
 async function carregarVeiculos() {
     try {
-        const token = localStorage.getItem("token");
-        
-        if (!token) {
-            alert("Sessão expirada. Faça login novamente.");
+        // M4 Fase 2: a sessão vive no cookie httpOnly; o guard só checa a
+        // presença de `usuario` (UI). 401 (cookie ausente/expirado) é tratado
+        // centralmente por apiFetch — limpa o estado e redireciona ao login.
+        if (!localStorage.getItem("usuario")) {
             window.location.href = "login.html";
             return;
         }
 
-        const resposta = await fetch(`${CONFIG.API_BASE_URL}/veiculos`, {
-            headers: {
-                "Authorization": `Bearer ${token}`
-            }
-        });
-        
-        if (resposta.status === 401) {
-            alert("Sessão expirada. Faça login novamente.");
-            localStorage.clear();
-            window.location.href = "login.html";
-            return;
-        }
-        
+        const resposta = await apiFetch("/veiculos");
+
         if (!resposta.ok) throw new Error("Falha de comunicação com o servidor.");
         
         const resultado = await resposta.json();
@@ -45,6 +34,8 @@ async function carregarVeiculos() {
                 </div>`;
         });
     } catch (erro) {
+        // 401 já tratado por apiFetch (redirect ao login em curso) — não renderizar erro.
+        if (erro && erro.isAuthRedirect) return;
         console.error("Erro tático de rede:", erro);
         document.getElementById('lista-veiculos').innerHTML = `
             <div style="text-align: center; color: #ef4444; padding: 20px;">
@@ -57,7 +48,6 @@ async function carregarVeiculos() {
 function iniciarChecklist(id, placa, tipo, modelo) {
     localStorage.setItem('veiculo_id', id);
     localStorage.setItem('veiculo_atual', placa);
-    localStorage.setItem('veiculo_tipo', tipo);
     localStorage.setItem('modelo_veiculo', modelo);
 
     console.log(`[ID SALVO]: ${id}`);

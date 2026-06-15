@@ -179,12 +179,20 @@
     por presença de `usuario` (ou `GET /api/me`).
   - **→ Verificar fluxo completo** (login → menu → seleção → checklist → bdv → admin → logout).
 
-  > 🚧 **Em andamento — primeira fatia (2026-06-15):** migrados `config.js` (helper `apiFetch`
-  > com `credentials:'include'` + tratamento central de 401), `auth.js` (login com
-  > `credentials:'include'`, **removido `setItem('token')`**) e **`menu.html`** (guard por presença
-  > de `usuario`, `bdv/ativo` via `apiFetch` no load e no `pageshow`, `fazerLogout` agora chama
-  > `POST /api/logout`). **Páginas restantes:** `checklist.html`, `bdv.html`, `admin-bdv.html`,
-  > `admin-funcionarios.html`, `admin-dashboard.html` e os JS `admin.js`, `checklist.js`, `frota.js`.
+  > 🚧 **Em andamento (2026-06-15):** base + **fluxo do motorista migrados**.
+  > - **Base:** `config.js` (helper `apiFetch` com `credentials:'include'`; em 401 limpa estado,
+  >   redireciona ao login e lança Error com `isAuthRedirect` p/ o catch do chamador pular alertas
+  >   duplicados) e `auth.js` (login com `credentials:'include'`, **removido `setItem('token')`**).
+  > - **`menu.html`:** guard por presença de `usuario`; `bdv/ativo` via `apiFetch` (load + `pageshow`);
+  >   `fazerLogout` chama `POST /api/logout`.
+  > - **`frota.js` + `selecao.html`:** `/veiculos` via `apiFetch`; guard `usuario`; removido write
+  >   morto de `veiculo_tipo` (`selecao.html` não precisou de mudança — já carrega `config.js`).
+  > - **`checklist.html` + `checklist.js`:** guards de load/`pageshow`/submit por `usuario`;
+  >   `bdv/ativo` e `POST /checklist` via `apiFetch`; 401 manual removido; flow lock preservado.
+  > - **`bdv.html`:** 16 sites migrados — abrir/encerrar BDV, paradas (saída/chegada), KM e estados
+  >   404→abrir preservados; `apiFetch` em todas as chamadas; 401 manual removido.
+  > - **Páginas restantes (fluxo admin):** `admin.js`, `admin-bdv.html`, `admin-funcionarios.html`,
+  >   `admin-dashboard.html` (esta só troca o guard `token`→`usuario`; não tem fetch).
 
   **Fase 3 — Limpeza do backend (após todo o frontend migrado — passo irreversível)**
   - `backend/src/middlewares/auth.middleware.js`: **remover o fallback de header `Authorization`**

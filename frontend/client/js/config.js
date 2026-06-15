@@ -12,7 +12,8 @@ const CONFIG = {
  *
  * `path` é relativo a API_BASE_URL (ex.: '/veiculos'). Retorna o objeto
  * Response — o chamador faz `.json()`/`.ok` como antes. Em 401, redireciona e
- * lança, interrompendo o fluxo do chamador.
+ * lança um Error com `isAuthRedirect === true` — o chamador pode checar essa
+ * flag no catch p/ pular alertas de erro genéricos (o redirect já está em curso).
  *
  * Obs.: o login (auth.js) NÃO usa este helper — um 401 lá é credencial inválida
  * e deve exibir o erro, não redirecionar.
@@ -34,7 +35,10 @@ async function apiFetch(path, opts = {}) {
     if (!window.location.pathname.endsWith('login.html')) {
       window.location.href = 'login.html';
     }
-    throw new Error('Não autenticado (401)');
+    const err = new Error('Não autenticado (401)');
+    err.isAuthRedirect = true; // sinaliza ao catch do chamador: redirect já em curso
+    err.status = 401;
+    throw err;
   }
 
   return resp;

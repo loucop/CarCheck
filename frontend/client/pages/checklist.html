@@ -209,20 +209,24 @@
     <script src="../js/checklist.js"></script>
     <script>
       // Guard: redirect to bdv.html if driver has an open BDV
+      // M4 Fase 2: guard por presença de `usuario`; /bdv/ativo via apiFetch
+      // (um 401 é tratado centralmente por apiFetch → login.html).
       (function () {
         const _init = window.onload;
         window.onload = async function () {
-          const token = localStorage.getItem("token");
-          if (token) {
+          if (localStorage.getItem("usuario")) {
             try {
-              const res = await fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
-                headers: { "Authorization": `Bearer ${token}` }
-              });
+              const res = await apiFetch("/bdv/ativo");
               if (res.ok) {
                 window.location.href = "bdv.html";
                 return;
               }
-            } catch (e) { /* network error — proceed normally */ }
+            } catch (e) {
+              // 401: apiFetch já redirecionou ao login — não siga p/ _init
+              // (evita o alerta de "Sessão expirada" de inicializarPagina).
+              if (e && e.isAuthRedirect) return;
+              /* erro de rede — segue normal */
+            }
           }
           if (_init) _init();
         };
@@ -230,13 +234,10 @@
 
       // Back-button guard: redirect on bfcache restore if a BDV is now open
       window.addEventListener('pageshow', function(event) {
-        const token = localStorage.getItem('token');
-        if (!token) { window.location.replace('login.html'); return; }
+        if (!localStorage.getItem('usuario')) { window.location.replace('login.html'); return; }
 
         if (event.persisted) {
-          fetch(`${CONFIG.API_BASE_URL}/bdv/ativo`, {
-            headers: { 'Authorization': 'Bearer ' + token }
-          }).then(function(r) {
+          apiFetch('/bdv/ativo').then(function(r) {
             if (r.ok) window.location.replace('bdv.html');
           }).catch(function() {});
         }
