@@ -7,20 +7,16 @@ const { TOKEN_COOKIE_NAME } = require('../utils/cookie');
  * Middleware de autenticação JWT
  * Valida token e injeta req.user
  *
- * M4 Fase 1 (dual-read): lê o token do cookie httpOnly primeiro; se ausente,
- * cai para o header Authorization (retrocompat com o frontend atual). O
- * fallback de header sai na Fase 3, tornando a auth cookie-only.
+ * M4 Fase 3 (cookie-only): o token vem EXCLUSIVAMENTE do cookie httpOnly. O
+ * fallback do header Authorization (dual-read da Fase 1) foi removido — todo
+ * cliente precisa enviar o cookie de sessão (`credentials:'include'`).
  */
 const authenticate = (req, res, next) => {
     try {
-        let token = req.cookies?.[TOKEN_COOKIE_NAME];
+        const token = req.cookies?.[TOKEN_COOKIE_NAME];
 
         if (!token) {
-            const authHeader = req.headers.authorization;
-            if (!authHeader || !authHeader.startsWith('Bearer ')) {
-                return response.unauthorized(res, 'Token não fornecido', ERROR_CODES.TOKEN_INVALID);
-            }
-            token = authHeader.substring(7);
+            return response.unauthorized(res, 'Token não fornecido', ERROR_CODES.TOKEN_INVALID);
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);

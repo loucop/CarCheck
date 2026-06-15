@@ -95,7 +95,18 @@
   (`DB_CONNECTION_LIMIT`, `JWT_EXPIRES_IN`, `HOST`).
   > Lembrete: `NODE_ENV=production` deve estar setado no deploy para o gate valer.
 
-- 🔵 **M4 — JWT em localStorage + ausência de logout server-side** *(em andamento — planejamento)*
+- ✅ **M4 — JWT em localStorage + ausência de logout server-side** *(concluído em 2026-06-15)*
+  > ✅ **Fase 3 concluída (2026-06-15) — auth cookie-only, irreversível.**
+  > `auth.middleware.js`: removido o fallback do header `Authorization` (lê o token **só** do cookie
+  > httpOnly). `auth.controller.js`: o login **não retorna mais o token no body** — entrega só via
+  > cookie; o body devolve apenas `{ user }`. Com isto o M4 está completo (Fases 0→3): `JWT_EXPIRES_IN=2h`,
+  > sessão em cookie httpOnly, `POST /api/logout`, `GET /api/me`, CSRF por Origin/Referer, e todo o
+  > frontend migrado para `apiFetch`. Revogação real / refresh-token rotation seguem como **Opção D**
+  > (ao ir a público) — ver nota abaixo.
+  > ⚠️ **Deploy:** rodar `npm ci` + reiniciar o backend e validar login → fluxo completo → logout no
+  > servidor. Após este deploy, clientes que ainda enviem só o header `Authorization` (páginas não
+  > atualizadas) recebem 401 — confirmar que o frontend da Fase 2 está publicado.
+
   **Achado completo:**
   - Token JWT guardado em `localStorage` → roubável via XSS (vetor que A1/S1 vêm mitigando).
   - **Não existe endpoint de logout no backend.** Logout é 100% client-side: `localStorage.clear()`

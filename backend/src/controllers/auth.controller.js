@@ -21,13 +21,12 @@ const authController = {
 
             const result = await authService.login(conn, matricula, senha);
 
-            // M4 Fase 1: além de retornar o token no body (retrocompat com o
-            // frontend atual que lê de localStorage), grava o token em cookie
-            // httpOnly. O frontend será migrado para o cookie na Fase 2; o body
-            // deixa de carregar o token na Fase 3.
+            // M4 Fase 3: a sessão é entregue SOMENTE via cookie httpOnly. O token
+            // não volta mais no body — o frontend usa apenas `user` (UI) e o
+            // cookie carrega a credencial em toda requisição.
             res.cookie(TOKEN_COOKIE_NAME, result.token, setCookieOptions());
 
-            return response.success(res, result, 'Login realizado com sucesso');
+            return response.success(res, { user: result.user }, 'Login realizado com sucesso');
 
         } catch (err) {
             next(err);
