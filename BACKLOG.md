@@ -106,6 +106,9 @@
       (via dispatcher — o parser global roda antes do router). Substitui o `50mb` global.
     - **Handler 413** (`errorHandler.middleware.js`): `entity.too.large`/413 → JSON limpo
       `"Requisição grande demais"` + novo código `PAYLOAD_TOO_LARGE`.
+    - ✅ **Deployado e verificado no servidor (2026-06-16):** checklist normal grava **201**; campo de
+      ~600 KB → **400** (cap Zod); body de 1,2 MB → **413 `PAYLOAD_TOO_LARGE`**; ciclo completo do
+      motorista (checklist + abrir BDV / paradas / encerrar) funciona.
   - **M1 — `itens_status: z.union([z.string().min(1), z.record(z.any())])` permissivo demais:** aceita
     qualquer string OU objeto de chaves/valores arbitrários; sem validação da forma esperada
     `{ item: { status, obs } }`. Render no admin escapa via `escHtml` (sem XSS/crash), mas o contrato
@@ -437,6 +440,14 @@
   Adotar uma ferramenta de migrations versionadas (ex.: node-pg-migrate equivalente p/ MariaDB, Umzug,
   Flyway) com histórico aplicado. **Obrigatório antes do deploy multi-cliente/multi-tenant** (M6) —
   sem isso, sincronizar schema entre tenants/ambientes é inviável.
+
+- ⬜ **B11 — `STORAGE.md` — documentar armazenamento real por linha e projeção de capacidade**
+  Documentar o custo de armazenamento por linha (sobretudo `checklists.mapa_avaria_base64` LONGTEXT e
+  `itens_status`) e projeções de capacidade. **Fazer só DEPOIS que o sistema estiver rodando em
+  produção com dados reais** — **medir o tamanho real das tabelas via `information_schema`** (ex.:
+  `information_schema.TABLES` → `DATA_LENGTH`/`AVG_ROW_LENGTH`; `information_schema.COLUMNS`) em vez de
+  estimar. Estimativas a priori (ex.: o cap de 500 KB do A4-H2) são tetos de validação, não o tamanho
+  típico real — o payload medido foi ~1,1 kB. Relaciona-se ao A4-H2 (caps) e ao planejamento de M6.
 
 ---
 
