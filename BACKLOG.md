@@ -171,17 +171,26 @@
   `limit`/`offset` do `findAllBDV`). Sem template literals com input interpolado e sem caminho de
   injeção de segunda ordem. A regra "só repositórios tocam SQL" (CLAUDE.md) está sendo mantida.
 
-- 🔵 **A6 — Soft-lock do motorista após checklist-sem-BDV** *(em andamento — abordagem (a), escopo motorista)*
+- 🔵 **A6 — Soft-lock do motorista após checklist-sem-BDV** *(abordagem (a), escopo motorista — implementado, pendente verificação no servidor)*
   > **Progresso (2026-06-16):** implementado em duas fatias.
   > - ✅ **Slice 1 (backend) — feito:** novo `GET /api/checklist/pendente` (repo
   >   `findPendingDetailTodayByMatricula` com JOIN veiculos → `id, veiculo_id, km_entrada, placa, modelo`;
   >   service `getChecklistPendente` espelhando `getBDVAtivo` com 200-ou-404 e BigInt→string; controller
   >   derivando a matrícula do `req.user`; rota com `authenticate`). **Pendente deploy+verificação.**
-  > - ⬜ **Slice 2 (frontend) — pendente:** guard de roteamento em `menu.html`/`checklist.html`
-  >   (precedência: `/bdv/ativo` ok → `bdv.html`; senão `/checklist/pendente` ok → `bdv.html`) +
-  >   auto-hidratação de `bdv.html` no estado "abrir" (busca `/checklist/pendente` quando
-  >   `localStorage.veiculo_id` está vazio, preenche veículo/KM). Abrir o BDV reusa o auto-link já
-  >   existente no backend (`openBDV` → `findPendingTodayByMatricula`).
+  > - ✅ **Slice 2 (frontend) — feito:** guard de roteamento em `menu.html` (load + pageshow) e
+  >   `checklist.html` (load + pageshow, novo check de órfão **gated a motorista** — vistoriador usa a
+  >   mesma página) — precedência `/bdv/ativo` ok → `bdv.html`; senão `/checklist/pendente` ok →
+  >   `bdv.html`. Auto-hidratação de `bdv.html` (`DOMContentLoaded`): quando `localStorage.veiculo_id`
+  >   está vazio, busca `/checklist/pendente`, grava veículo no localStorage e segue (em vez de cair em
+  >   selecao.html); o KM é pré-preenchido pelo `preencherKmInicial` existente. Abrir o BDV reusa o
+  >   auto-link já existente no backend (`openBDV` → `findPendingTodayByMatricula`). Tudo via `apiFetch`
+  >   com supressão de `isAuthRedirect`. **Pendente verificação no servidor** (deploy de arquivos
+  >   estáticos — sem restart do backend): motorista que envia checklist e sai antes do BDV é roteado
+  >   de volta a `bdv.html` e consegue abrir/encerrar o BDV; vistoriador não é afetado em nenhum caminho.
+  > - ⚠️ **Premissa da abordagem (a):** assume que o órfão é um checklist **legítimo** — a recuperação
+  >   força o motorista a abrir/encerrar o BDV daquele checklist (único caminho de saída). A limpeza de
+  >   **órfão equivocado** (descartar/corrigir sem forçar uma viagem) é uma preocupação de **vistoriador
+  >   → ver A7** (correção/override role-aware), não do fluxo do motorista.
 
   Se um motorista **envia o checklist mas sai antes de abrir o BDV**, o guard de duplicidade de
   checklist (`findPendingTodayByMatricula`) bloqueia **qualquer novo checklist naquele dia**, mas
