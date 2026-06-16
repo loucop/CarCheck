@@ -425,15 +425,26 @@
       let paradaEmFechamento = null;
 
       // ─── Auth + Init ───────────────────────────────────────────────
-      document.addEventListener('DOMContentLoaded', () => {
+      document.addEventListener('DOMContentLoaded', async () => {
         // M4 Fase 2: a sessão vive no cookie httpOnly; o guard checa só `usuario`.
-        const usuario = localStorage.getItem('usuario');
-        if (!usuario) {
+        const usuarioRaw = localStorage.getItem('usuario');
+        if (!usuarioRaw) {
           window.location.href = 'login.html';
           return;
         }
+        const usuario = JSON.parse(usuarioRaw);
 
-        const veiculoId = localStorage.getItem('veiculo_id');
+        let veiculoId = localStorage.getItem('veiculo_id');
+
+        // A6: motorista que volta sem contexto local (nova sessão após enviar o
+        // checklist e sair antes de abrir o BDV) — hidrata veículo a partir do
+        // checklist órfão para não cair em selecao.html e ficar travado.
+        if (!veiculoId && usuario.nivel_acesso === 'motorista') {
+          if (await hidratarDeChecklistPendente()) {
+            veiculoId = localStorage.getItem('veiculo_id');
+          }
+        }
+
         const placa     = localStorage.getItem('veiculo_atual') || '—';
         const modelo    = localStorage.getItem('modelo_veiculo') || placa;
 
@@ -488,6 +499,32 @@
         if (estado === 'loading')    document.getElementById('estado-loading').style.display   = 'block';
         if (estado === 'abrir')      document.getElementById('estado-abrir').style.display     = 'block';
         if (estado === 'andamento')  document.getElementById('estado-andamento').style.display = 'block';
+      }
+
+      // ─── A6: hidratar contexto do veículo a partir do checklist órfão ──
+      // Motorista que retorna sem localStorage (nova sessão após sair sem abrir
+      // o BDV). Busca /checklist/pendente (200 = órfão; 404 = nenhum), grava
+      // veiculo_id/placa/modelo no localStorage e reflete no cabeçalho. O KM é
+      // pré-preenchido depois por preencherKmInicial (a partir do /veiculos).
+      // Retorna true se hidratou. Abrir o BDV reusa o auto-link do backend.
+      async function hidratarDeChecklistPendente() {
+        try {
+          const res = await apiFetch('/checklist/pendente');
+          if (!res.ok) return false;            // 404 → sem checklist órfão
+          const json = await res.json();
+          const p = json && json.data;
+          if (!p || !p.veiculo_id) return false;
+          localStorage.setItem('veiculo_id', String(p.veiculo_id));
+          if (p.placa)  localStorage.setItem('veiculo_atual', p.placa);
+          if (p.modelo) localStorage.setItem('modelo_veiculo', p.modelo);
+          document.getElementById('placa-display').textContent  = p.placa  || '—';
+          document.getElementById('modelo-display').textContent = p.modelo || p.placa || '—';
+          return true;
+        } catch (err) {
+          if (err && err.isAuthRedirect) return false;
+          console.error('[BDV] Erro ao hidratar do checklist pendente:', err);
+          return false;
+        }
       }
 
       // ─── API: pré-preencher KM inicial ────────────────────────────

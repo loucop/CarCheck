@@ -178,8 +178,16 @@
 
           if (usuario.nivel_acesso === "motorista") {
               try {
-                  const res = await apiFetch("/bdv/ativo");
-                  if (res.ok) {
+                  // Precedência: BDV aberto (em viagem) vence → bdv.html.
+                  const ativo = await apiFetch("/bdv/ativo");
+                  if (ativo.ok) {
+                      window.location.href = "bdv.html";
+                      return;
+                  }
+                  // A6: sem BDV aberto, mas há checklist órfão (sem BDV) → roteia
+                  // para bdv.html abrir o BDV daquele checklist (sai do soft-lock).
+                  const pendente = await apiFetch("/checklist/pendente");
+                  if (pendente.ok) {
                       window.location.href = "bdv.html";
                   }
               } catch (e) {
@@ -204,8 +212,14 @@
           const usuario = JSON.parse(dadosSessao);
           if (usuario.nivel_acesso === 'motorista') {
               try {
-                  const res = await apiFetch('/bdv/ativo');
-                  if (res.ok) {
+                  const ativo = await apiFetch('/bdv/ativo');
+                  if (ativo.ok) {
+                      window.location.href = 'bdv.html';
+                      return;
+                  }
+                  // A6: checklist órfão (sem BDV) → roteia para abrir o BDV dele.
+                  const pendente = await apiFetch('/checklist/pendente');
+                  if (pendente.ok) {
                       window.location.href = 'bdv.html';
                   }
               } catch (e) { /* erro de rede / 401 já tratado — fica no menu */ }

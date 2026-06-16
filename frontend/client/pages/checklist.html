@@ -214,12 +214,23 @@
       (function () {
         const _init = window.onload;
         window.onload = async function () {
-          if (localStorage.getItem("usuario")) {
+          const dados = localStorage.getItem("usuario");
+          if (dados) {
             try {
-              const res = await apiFetch("/bdv/ativo");
-              if (res.ok) {
+              const ativo = await apiFetch("/bdv/ativo");
+              if (ativo.ok) {
                 window.location.href = "bdv.html";
                 return;
+              }
+              // A6: motorista com checklist órfão (sem BDV) → roteia p/ abrir o BDV.
+              // Gated a motorista: p/ vistoriador o checklist é estado final válido.
+              const usuario = JSON.parse(dados);
+              if (usuario.nivel_acesso === "motorista") {
+                const pendente = await apiFetch("/checklist/pendente");
+                if (pendente.ok) {
+                  window.location.href = "bdv.html";
+                  return;
+                }
               }
             } catch (e) {
               // 401: apiFetch já redirecionou ao login — não siga p/ _init
@@ -233,13 +244,23 @@
       })();
 
       // Back-button guard: redirect on bfcache restore if a BDV is now open
-      window.addEventListener('pageshow', function(event) {
-        if (!localStorage.getItem('usuario')) { window.location.replace('login.html'); return; }
+      window.addEventListener('pageshow', async function(event) {
+        const dados = localStorage.getItem('usuario');
+        if (!dados) { window.location.replace('login.html'); return; }
+        if (!event.persisted) return;
 
-        if (event.persisted) {
-          apiFetch('/bdv/ativo').then(function(r) {
-            if (r.ok) window.location.replace('bdv.html');
-          }).catch(function() {});
+        try {
+          const ativo = await apiFetch('/bdv/ativo');
+          if (ativo.ok) { window.location.replace('bdv.html'); return; }
+          // A6: motorista com checklist órfão → abrir o BDV dele (gated a motorista).
+          const usuario = JSON.parse(dados);
+          if (usuario.nivel_acesso === 'motorista') {
+            const pendente = await apiFetch('/checklist/pendente');
+            if (pendente.ok) window.location.replace('bdv.html');
+          }
+        } catch (e) {
+          if (e && e.isAuthRedirect) return;
+          /* erro de rede — fica */
         }
       });
     </script>
