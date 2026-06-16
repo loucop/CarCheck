@@ -171,7 +171,18 @@
   `limit`/`offset` do `findAllBDV`). Sem template literals com input interpolado e sem caminho de
   injeção de segunda ordem. A regra "só repositórios tocam SQL" (CLAUDE.md) está sendo mantida.
 
-- ⬜ **A6 — Soft-lock do motorista após checklist-sem-BDV**
+- 🔵 **A6 — Soft-lock do motorista após checklist-sem-BDV** *(em andamento — abordagem (a), escopo motorista)*
+  > **Progresso (2026-06-16):** implementado em duas fatias.
+  > - ✅ **Slice 1 (backend) — feito:** novo `GET /api/checklist/pendente` (repo
+  >   `findPendingDetailTodayByMatricula` com JOIN veiculos → `id, veiculo_id, km_entrada, placa, modelo`;
+  >   service `getChecklistPendente` espelhando `getBDVAtivo` com 200-ou-404 e BigInt→string; controller
+  >   derivando a matrícula do `req.user`; rota com `authenticate`). **Pendente deploy+verificação.**
+  > - ⬜ **Slice 2 (frontend) — pendente:** guard de roteamento em `menu.html`/`checklist.html`
+  >   (precedência: `/bdv/ativo` ok → `bdv.html`; senão `/checklist/pendente` ok → `bdv.html`) +
+  >   auto-hidratação de `bdv.html` no estado "abrir" (busca `/checklist/pendente` quando
+  >   `localStorage.veiculo_id` está vazio, preenche veículo/KM). Abrir o BDV reusa o auto-link já
+  >   existente no backend (`openBDV` → `findPendingTodayByMatricula`).
+
   Se um motorista **envia o checklist mas sai antes de abrir o BDV**, o guard de duplicidade de
   checklist (`findPendingTodayByMatricula`) bloqueia **qualquer novo checklist naquele dia**, mas
   **nenhum fluxo o roteia para recuperação** — o checklist órfão não está ligado a um BDV e fica
@@ -184,6 +195,26 @@
     - **(c)** **auto-expirar/limpar** checklists não-vinculados (ex.: job ou checagem no load).
   - **Decidir abordagem na implementação.** Relaciona-se ao flow lock linear (CLAUDE.md: "Linear Flow
     Lock") e ao link `checklist_id` ↔ BDV (C1).
+  - **Vistoriador faz inspeção sem viagem:** para **vistoriadores**, um checklist é um **estado final
+    válido** — o fluxo de BDV e o guard de duplicidade **NÃO** devem se aplicar. A correção de
+    recuperação do A6 é escopada **apenas a motoristas**. **Trabalho futuro:** tornar o fluxo
+    checklist→BDV **role-aware**, de modo que checklists de vistoriador não disparem o soft-lock nem
+    exijam um BDV.
+
+- ⬜ **A7 — Capacidades de correção/override do vistoriador (papel de supervisor)**
+  O papel **vistoriador** deve poder: **(1)** definir/corrigir qualquer valor de **KM**, inclusive
+  **sobrepondo a validação de monotonicidade do KM** (caso um motorista tenha digitado errado); e
+  **(2)** sinalizar e corrigir uma gama de erros em **checklists/BDVs**. É um papel de **override de
+  nível supervisor**, distinto de **motorista**.
+  - **Requer:**
+    - **Modelo de permissão** para quem pode burlar o lock `SELECT ... FOR UPDATE` de KM / o guard de
+      monotonicidade (ver `checklist.service.js` e `bdv.service.js` — validação `km >= km_atual`).
+    - **Trilha de auditoria** do que o vistoriador alterou: **quem / quando / valor antigo → novo**.
+    - **UI** para o fluxo de correção.
+  - Liga-se ao trabalho **role-aware** de checklist/BDV da nota de vistoriador do **A6**. Também se
+    relaciona ao controle de acesso por objeto (A3) e ao planejamento multi-tenant (M6, escopo de
+    `coligada`/tenant para correções).
+  - **Documentar apenas; implementar depois.**
 
 ---
 
