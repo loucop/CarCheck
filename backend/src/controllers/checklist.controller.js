@@ -36,6 +36,34 @@ const checklistController = {
   },
 
   /**
+   * GET /api/checklist/pendente
+   * Checklist órfão (do dia, sem BDV vinculado) do motorista autenticado.
+   * A matrícula vem do JWT (req.user), nunca do body (A3). 200 ou 404 (A6).
+   */
+  async getPendente(req, res, next) {
+    let conn;
+
+    try {
+      conn = await pool.getConnection();
+
+      const result = await checklistService.getChecklistPendente(
+        conn,
+        req.user.matricula,
+      );
+
+      return response.success(res, result);
+
+    } catch (err) {
+      return next(err);
+
+    } finally {
+      if (conn) {
+        conn.release();
+      }
+    }
+  },
+
+  /**
    * GET /api/veiculos/:id/historico
    */
   async getHistoricoVeiculo(req, res, next) {

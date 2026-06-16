@@ -56,6 +56,28 @@ const checklistRepository = {
         return rows.length > 0 ? rows[0] : null;
     },
 
+    // A6: mesmo critério de "órfão" do findPendingTodayByMatricula (checklist de
+    // hoje, do motorista, ainda não vinculado a um BDV), mas com o contexto de
+    // veículo que a recuperação precisa para abrir o BDV (veiculo_id + KM + placa/modelo).
+    async findPendingDetailTodayByMatricula(conn, matricula) {
+        const query = `
+            SELECT
+                c.id,
+                c.veiculo_id,
+                c.km_entrada,
+                v.placa,
+                v.modelo
+            FROM checklists c
+            LEFT JOIN veiculos v ON v.id = c.veiculo_id
+            WHERE c.matricula = ?
+              AND DATE(c.data_inspecao) = CURDATE()
+              AND c.id NOT IN (SELECT checklist_id FROM bdv WHERE checklist_id IS NOT NULL)
+            ORDER BY c.id DESC LIMIT 1
+        `;
+        const rows = await conn.query(query, [matricula]);
+        return rows.length > 0 ? rows[0] : null;
+    },
+
     async findRelatorio(conn, funcionarioMatricula, limit, offset) {
         let query = `
             SELECT 

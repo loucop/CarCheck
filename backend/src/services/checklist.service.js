@@ -109,6 +109,26 @@ const checklistService = {
         return { veiculo, historico, total, limit, offset };
     },
 
+    // A6: checklist órfão do motorista (hoje, sem BDV vinculado). Espelha
+    // getBDVAtivo: 200 com o checklist ou 404 quando não há. Motorista-scoped.
+    async getChecklistPendente(conn, matricula) {
+        const pendente = await checklistRepository.findPendingDetailTodayByMatricula(conn, matricula);
+
+        if (!pendente) {
+            throw {
+                message: 'Nenhum checklist pendente para este motorista',
+                code: ERROR_CODES.RESOURCE_NOT_FOUND,
+                statusCode: 404
+            };
+        }
+
+        return {
+            ...pendente,
+            id: String(pendente.id),
+            veiculo_id: String(pendente.veiculo_id)
+        };
+    },
+
     async getRelatorioAdmin(conn, funcionarioMatricula, limit, offset) {
         const relatorios = await checklistRepository.findRelatorio(conn, funcionarioMatricula, limit, offset);
 

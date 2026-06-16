@@ -88,6 +88,17 @@ router.post(
     checklistController.createChecklist
 );
 
+/**
+ * GET /api/checklist/pendente
+ * Checklist do dia, do motorista autenticado, ainda não vinculado a um BDV (órfão).
+ * 200 com o checklist ou 404 quando não há — mesma forma de /api/bdv/ativo. (A6)
+ */
+router.get(
+    '/checklist/pendente',
+    authenticate,
+    checklistController.getPendente
+);
+
 // ==========================================
 // ROTAS DE BDV (Autenticadas)
 // ==========================================
