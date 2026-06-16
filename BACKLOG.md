@@ -94,14 +94,18 @@
 
 - ⬜ **A4 — Endurecimento de validação de input (Zod) — limites de tamanho e schemas frouxos**
   Auditoria de validação/injeção em 2026-06-15. Camada Zod (`validate.middleware.js`) sem caps de
-  tamanho e com schemas permissivos. **Sem fix ainda.**
-  - **H2 (alto) — sem `.max()` + `express.json({ limit: '50mb' })` (`index.js:89`) = DoS/amplificação
-    de armazenamento por usuário autenticado.** Nenhum schema limita comprimento de string; os campos
-    controlados pelo motorista caem em `LONGTEXT`. Piores: `createChecklist.mapa_avaria_base64`
-    (`z.string().optional()`, sem cap), `itens_status` (sem cap) e os textos livres `local_origem`,
-    `local_destino`, `observacao`, `combustivel_retorno`. Um motorista pode empurrar ~50 MB por
-    requisição direto no banco. **Ação:** adicionar `.max()` nesses campos; baixar o limite do
-    `express.json` **ou** escopar o `50mb` somente à rota de checklist (que carrega o PNG base64).
+  tamanho e com schemas permissivos. **H2 corrigido (2026-06-16); M1–M4 e L1–L3 seguem pendentes.**
+  - ✅ **H2 (alto) — sem `.max()` + `express.json({ limit: '50mb' })` = DoS/amplificação de armazenamento**
+    *(corrigido em 2026-06-16)*. Payload real medido (checklist com avaria desenhada) ≈ 1,1 kB → caps
+    apertados aplicados:
+    - **`.max()` em todos os campos string** sem limite (`validate.middleware.js`): `mapa_avaria_base64`
+      `500000`; branch string de `itens_status` `20000` (o branch `z.record` segue **sem cap** → A4-M1);
+      locais `200`, `observacao` `1000`, `hora_*`/`data_*` `32`, `combustivel_retorno` `50`,
+      `matricula`/`coligada`/`funcionario_id` `20`, `nome` `120`, `senha` `128`.
+    - **Limite de body por rota** (`index.js`): default global `100kb`; só `POST /api/checklist` → `1mb`
+      (via dispatcher — o parser global roda antes do router). Substitui o `50mb` global.
+    - **Handler 413** (`errorHandler.middleware.js`): `entity.too.large`/413 → JSON limpo
+      `"Requisição grande demais"` + novo código `PAYLOAD_TOO_LARGE`.
   - **M1 — `itens_status: z.union([z.string().min(1), z.record(z.any())])` permissivo demais:** aceita
     qualquer string OU objeto de chaves/valores arbitrários; sem validação da forma esperada
     `{ item: { status, obs } }`. Render no admin escapa via `escHtml` (sem XSS/crash), mas o contrato
@@ -163,6 +167,20 @@
   (`'b.matricula = ?'`, `' LIMIT ?'`) e empurram os valores para `params` (com `Number()` no
   `limit`/`offset` do `findAllBDV`). Sem template literals com input interpolado e sem caminho de
   injeção de segunda ordem. A regra "só repositórios tocam SQL" (CLAUDE.md) está sendo mantida.
+
+- ⬜ **A6 — Soft-lock do motorista após checklist-sem-BDV**
+  Se um motorista **envia o checklist mas sai antes de abrir o BDV**, o guard de duplicidade de
+  checklist (`findPendingTodayByMatricula`) bloqueia **qualquer novo checklist naquele dia**, mas
+  **nenhum fluxo o roteia para recuperação** — o checklist órfão não está ligado a um BDV e fica
+  inacessível. A checagem `GET /bdv/ativo` retorna **404** (não há BDV aberto), então o flow lock
+  também **não** o redireciona. Resultado: motorista travado pelo resto do dia, sem caminho de volta.
+  - **Precisa de um caminho de recuperação** — decidir a abordagem ao implementar:
+    - **(a)** `menu`/`checklist` detecta um checklist-sem-BDV não-vinculado e roteia o motorista para
+      **abrir o BDV daquele checklist**;
+    - **(b)** permitir **reentrada no checklist** (reabrir/editar o existente);
+    - **(c)** **auto-expirar/limpar** checklists não-vinculados (ex.: job ou checagem no load).
+  - **Decidir abordagem na implementação.** Relaciona-se ao flow lock linear (CLAUDE.md: "Linear Flow
+    Lock") e ao link `checklist_id` ↔ BDV (C1).
 
 ---
 
