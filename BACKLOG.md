@@ -45,25 +45,17 @@
   > (ex.: `CORS_ORIGINS=https://carcheck.seudominio.com`) no `.env` de produção, senão o
   > frontend público será bloqueado pelo navegador.
 
-- 🚧 **A3 — Submissão confia em `req.body.matricula` em vez de `req.user.matricula` (IDOR/spoof de identidade)** *(correção implementada no working tree — NÃO commitada, NÃO deployada)*
-  > ⚠️ **AÇÃO NA PRÓXIMA SESSÃO — a correção do A3 está apenas no working tree (não commitada).**
-  > Não há acesso ao servidor deste ambiente; o deploy é manual. Executar **nesta ordem**:
-  > 1. **Deploy dos 4 arquivos backend** para o servidor:
-  >    - `backend/src/middlewares/validate.middleware.js` (remove `matricula` do schema `createChecklist`)
-  >    - `backend/src/controllers/checklist.controller.js` (injeta `matricula: req.user.matricula`)
-  >    - `backend/src/controllers/bdv.controller.js` (passa `req.user` para `getBDV`)
-  >    - `backend/src/services/bdv.service.js` (guard de ownership role-aware em `getBDV`)
-  > 2. **Reiniciar o Node** (`npm ci` se necessário + restart do processo backend).
-  > 3. **Rodar os 4 testes de fronteira de identidade** (todos devem passar):
-  >    - **T1 — spoof de checklist:** logado como motorista A, `POST /checklist` com `matricula: <B>` no
-  >      corpo → o checklist é gravado sob **A** (JWT), nunca B. (campo do body ignorado)
-  >    - **T2 — guard de duplicidade usa o JWT:** motorista A com checklist pendente do dia → novo
-  >      `POST /checklist` (com qualquer `matricula` no corpo) → **409** baseado em A, não no body.
-  >    - **T3 — IDOR de leitura de BDV:** motorista A faz `GET /bdv/:id` de um BDV do motorista B → **403**;
-  >      `GET /bdv/:id` do próprio BDV de A → **200**.
-  >    - **T4 — admin preservado:** logado como admin, `GET /bdv/:id` de qualquer BDV → **200** e o
-  >      relatório `admin-bdv.html` carrega as contagens de paradas (que chamam `/bdv/:id` por linha).
-  > 4. **Só então commitar** os 4 arquivos backend (esta nota do BACKLOG já estará commitada à parte).
+- ✅ **A3 — Submissão confia em `req.body.matricula` em vez de `req.user.matricula` (IDOR/spoof de identidade)** *(concluído em 2026-06-16 — deployado, testado e commitado)*
+  > ✅ **Gate de deploy+teste concluído (2026-06-16).** Os 4 arquivos backend foram deployados, o Node
+  > reiniciado, e os 4 testes de fronteira de identidade **passaram** no servidor — depois commitados
+  > (`fix: derive identity from JWT not request body + close BDV read IDOR (A3)`):
+  >    - **T1 — spoof de checklist:** ✅ logado como motorista A, `POST /checklist` com `matricula: <B>` no
+  >      corpo → checklist gravado sob **A** (JWT), campo do body ignorado.
+  >    - **T2 — guard de duplicidade usa o JWT:** ✅ A com checklist pendente do dia → novo `POST /checklist`
+  >      (com `matricula` de B no corpo) → **409** baseado em A, não no body.
+  >    - **T3 — IDOR de leitura de BDV:** ✅ A faz `GET /bdv/:id` de um BDV de B → **403**; do próprio → **200**.
+  >    - **T4 — admin preservado:** ✅ admin `GET /bdv/:id` de qualquer BDV → **200**; `admin-bdv.html` carrega
+  >      as contagens de paradas.
 
   > ✅ **Auditoria + correção (2026-06-15):**
   > - **#1 `POST /checklist` (vuln confirmada):** `matricula` removida do schema Zod `createChecklist`;
