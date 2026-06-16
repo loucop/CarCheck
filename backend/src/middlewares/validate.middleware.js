@@ -31,15 +31,15 @@ const validate = (schema, source = 'body') => {
 
 const schemas = {
     login: z.object({
-        matricula: z.string().min(1, 'Matrícula obrigatória'),
-        senha: z.string().min(1, 'Senha obrigatória')
+        matricula: z.string().min(1, 'Matrícula obrigatória').max(20),
+        senha: z.string().min(1, 'Senha obrigatória').max(128)
     }),
 
     createFuncionario: z.object({
-        matricula: z.string().min(1, 'Matrícula obrigatória'),
-        nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
+        matricula: z.string().min(1, 'Matrícula obrigatória').max(20),
+        nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(120),
         cpf: z.string().regex(/^\d{11}$/, 'CPF deve conter 11 dígitos'),
-        senha: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
+        senha: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres').max(128),
         nivel_acesso: z.enum(['admin', 'vistoriador', 'motorista'], {
             errorMap: () => ({ message: "Nível de acesso deve ser 'admin', 'vistoriador' ou 'motorista'" })
         }),
@@ -51,13 +51,15 @@ const schemas = {
     createChecklist: z.object({
         veiculo_id: z.coerce.number().int().positive('ID do veículo inválido'),
         km_entrada: z.coerce.number().nonnegative('KM não pode ser negativo'),
-        local_origem: z.string().optional().nullable(),
-        local_destino: z.string().optional().nullable(),
+        local_origem: z.string().max(200).optional().nullable(),
+        local_destino: z.string().max(200).optional().nullable(),
         itens_status: z.union([
-            z.string().min(1),
+            // A4-H2: cap no branch string. O branch z.record fica SEM cap de tamanho —
+            // validar a forma { item: { status, obs } } está deferido ao A4-M1.
+            z.string().min(1).max(20000),
             z.record(z.any())
         ]),
-        mapa_avaria_base64: z.string().optional()
+        mapa_avaria_base64: z.string().max(500000).optional()
     }),
 
     historicoVeiculo: z.object({
@@ -65,7 +67,7 @@ const schemas = {
     }),
 
     relatorioAdmin: z.object({
-        funcionario_id: z.string().optional(),
+        funcionario_id: z.string().max(20).optional(),
         limit: z.coerce.number().int().positive().max(500).default(100),
         offset: z.coerce.number().int().nonnegative().default(0)
     }),
@@ -78,23 +80,23 @@ const schemas = {
     }),
 
     addParada: z.object({
-        local_saida: z.string().min(1),
-        hora_saida: z.string(),
+        local_saida: z.string().min(1).max(200),
+        hora_saida: z.string().max(32),
         km: z.coerce.number().nonnegative().optional().nullable(),
-        local_chegada: z.string().optional().nullable(),
-        observacao: z.string().optional().nullable()
+        local_chegada: z.string().max(200).optional().nullable(),
+        observacao: z.string().max(1000).optional().nullable()
     }),
 
     closeParada: z.object({
-        local_chegada: z.string().min(1),
-        hora_chegada: z.string(),
+        local_chegada: z.string().min(1).max(200),
+        hora_chegada: z.string().max(32),
         km: z.coerce.number().nonnegative().optional().nullable(),
-        observacao: z.string().optional().nullable()
+        observacao: z.string().max(1000).optional().nullable()
     }),
 
     closeBDV: z.object({
         km_final: z.coerce.number().nonnegative('KM final inválido'),
-        combustivel_retorno: z.string().min(1, 'Combustível de retorno obrigatório'),
+        combustivel_retorno: z.string().min(1, 'Combustível de retorno obrigatório').max(50),
         encerrado_fora_base: z.boolean().default(false)
     }),
 
@@ -108,12 +110,12 @@ const schemas = {
     }),
 
     relatorioBDV: z.object({
-        matricula: z.string().optional(),
+        matricula: z.string().max(20).optional(),
         veiculo_id: z.coerce.number().int().positive().optional(),
-        coligada: z.string().optional(),
+        coligada: z.string().max(20).optional(),
         status: z.enum(['aberto', 'encerrado']).optional(),
-        data_inicio: z.string().optional(),
-        data_fim: z.string().optional(),
+        data_inicio: z.string().max(32).optional(),
+        data_fim: z.string().max(32).optional(),
         limit: z.coerce.number().int().positive().max(500).default(100),
         offset: z.coerce.number().int().nonnegative().default(0)
     })

@@ -49,6 +49,16 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
+    // A4-H2: body excede o limite do express.json (dispatcher por rota em index.js).
+    // body-parser lança http-errors com type 'entity.too.large' / status 413.
+    if (err.type === 'entity.too.large' || err.statusCode === 413 || err.status === 413) {
+        return res.status(413).json({
+            success: false,
+            error: 'Requisição grande demais',
+            code: ERROR_CODES.PAYLOAD_TOO_LARGE
+        });
+    }
+
     // Erro customizado (do service)
     if (err.statusCode) {
         return res.status(err.statusCode).json({

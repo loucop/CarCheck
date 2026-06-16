@@ -86,7 +86,19 @@ app.use(cors({
     methods: ['GET', 'POST', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '50mb' }));
+// A4-H2: limite de body por rota. Default global apertado (100kb); só o
+// POST /api/checklist carrega payload grande (mapa de avaria base64) → 1mb.
+// Evita amplificação de DoS/armazenamento por usuário autenticado em todas as
+// demais rotas. O parser global roda antes do router, então o dispatcher precisa
+// escolher o limite aqui (um parser maior na rota não adiantaria — o global já
+// teria recusado o body antes).
+const smallJson = express.json({ limit: '100kb' });
+const checklistJson = express.json({ limit: '1mb' });
+app.use((req, res, next) =>
+    (req.method === 'POST' && req.path === '/api/checklist')
+        ? checklistJson(req, res, next)
+        : smallJson(req, res, next)
+);
 app.use(cookieParser());
 // CSRF: checagem de Origin/Referer em métodos que alteram estado. Aplicado
 // globalmente (métodos seguros são ignorados pelo próprio middleware), antes
