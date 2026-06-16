@@ -46,10 +46,10 @@ const schemas = {
         coligada: z.enum(['angels', 'cemax']).optional().nullable()
     }),
 
-    // matricula usa coerce para aceitar número ou string (ex: matricula = 3)
+    // A3: a matrícula NÃO vem do corpo — é derivada do JWT (req.user) no controller.
+    // Qualquer `matricula` enviada no body é ignorada (z.object remove chaves desconhecidas).
     createChecklist: z.object({
         veiculo_id: z.coerce.number().int().positive('ID do veículo inválido'),
-        matricula: z.coerce.string().min(1, 'Matrícula obrigatória'),
         km_entrada: z.coerce.number().nonnegative('KM não pode ser negativo'),
         local_origem: z.string().optional().nullable(),
         local_destino: z.string().optional().nullable(),

@@ -55,7 +55,8 @@ const bdvController = {
         try {
             conn = await pool.getConnection();
 
-            const result = await bdvService.getBDV(conn, parseInt(req.params.id));
+            // A3 #7: passa o solicitante (JWT) para o guard de ownership no service.
+            const result = await bdvService.getBDV(conn, parseInt(req.params.id), req.user);
 
             return response.success(res, result);
 

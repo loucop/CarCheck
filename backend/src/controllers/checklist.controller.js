@@ -12,9 +12,11 @@ const checklistController = {
     try {
       conn = await pool.getConnection();
 
+      // A3: a identidade vem SEMPRE do JWT, nunca do corpo. A matrícula injetada
+      // aqui é a usada tanto no guard de duplicidade quanto no INSERT (service).
       const result = await checklistService.createChecklist(
         conn,
-        req.body,
+        { ...req.body, matricula: req.user.matricula },
       );
 
       return response.created(

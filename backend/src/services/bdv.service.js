@@ -245,7 +245,7 @@ const bdvService = {
         };
     },
 
-    async getBDV(conn, id) {
+    async getBDV(conn, id, requester) {
         const bdv = await bdvRepository.findBDVById(conn, id);
 
         if (!bdv) {
@@ -253,6 +253,16 @@ const bdvService = {
                 message: 'BDV não encontrado',
                 code: ERROR_CODES.RESOURCE_NOT_FOUND,
                 statusCode: 404
+            };
+        }
+
+        // A3 #7: guard de ownership (BOLA/IDOR). Só o dono do BDV ou um admin
+        // pode lê-lo — o relatório admin (/admin/bdv) usa este endpoint com role admin.
+        if (requester.nivel_acesso !== 'admin' && bdv.matricula !== requester.matricula) {
+            throw {
+                message: 'Acesso negado: este BDV pertence a outro motorista',
+                code: ERROR_CODES.INSUFFICIENT_PERMISSION,
+                statusCode: 403
             };
         }
 
