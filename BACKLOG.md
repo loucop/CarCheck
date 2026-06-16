@@ -124,8 +124,19 @@
   - **L3 — `migrate-passwords.js` carrega todas as linhas sem `WHERE`** — ok na escala atual; revisitar
     se `funcionarios` crescer. (O problema grave do script está em **A5**.)
 
-- ⬜ **A5 — `scripts/migrate-passwords.js` está quebrado e é destrutivo de dados — NÃO RODAR**
-  Achado na auditoria de 2026-06-15. **Não executar o script até ser reconciliado com o schema real.**
+- ✅ **A5 — `scripts/migrate-passwords.js` está quebrado e é destrutivo de dados** *(corrigido em 2026-06-16)*
+  > ✅ **Reconciliado e endurecido (2026-06-16).** O script foi reescrito:
+  > - **Colunas corrigidas:** `SELECT matricula, nome, senha`; `UPDATE ... SET senha = ? WHERE matricula = ?`
+  >   (PK `matricula`, coluna `senha` — alinhado a `funcionario.repository.js`).
+  > - **Detecção de bcrypt completa:** regex `^\$2[aby]\$` cobre `$2a$`/`$2b$`/`$2y$` (skip), só re-hasheia texto plano real.
+  > - **Null-guard:** linhas com `senha` nula/vazia são puladas antes de qualquer checagem de prefixo.
+  > - **Transação:** `beginTransaction` → loop → `commit`; erro no meio dispara `rollback` (nenhuma senha alterada).
+  > - **`--dry-run`** (read-only, reporta `[WOULD MIGRATE]` sem gravar) + **flag de segurança** `--i-know-its-fixed`
+  >   (ou `MIGRATE_PASSWORDS_CONFIRMED=1`) que TRAVA o modo de gravação com mensagem explicando o achado da auditoria.
+  > **Pré-execução recomendada:** rodar `--dry-run` contra o banco vivo + backup da tabela antes de gravar.
+  > Relaciona-se a M5-b (`bcrypt`→`bcryptjs`).
+
+  **Achado original (referência):** Achado na auditoria de 2026-06-15. **Não executar o script até ser reconciliado com o schema real.**
   - **Colunas/PK erradas:** o script usa `SELECT id, nome, senha_hash FROM funcionarios` e
     `UPDATE ... SET senha_hash = ? WHERE id = ?`. Mas, pelo schema (CLAUDE.md) e por **todos** os
     repositórios, a PK é **`matricula`** (não há `id`) e a coluna de senha é **`senha`** (não há
