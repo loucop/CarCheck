@@ -434,17 +434,18 @@
         }
         const usuario = JSON.parse(usuarioRaw);
 
-        let veiculoId = localStorage.getItem('veiculo_id');
-
-        // A6: motorista que volta sem contexto local (nova sessão após enviar o
-        // checklist e sair antes de abrir o BDV) — hidrata veículo a partir do
-        // checklist órfão para não cair em selecao.html e ficar travado.
-        if (!veiculoId && usuario.nivel_acesso === 'motorista') {
-          if (await hidratarDeChecklistPendente()) {
-            veiculoId = localStorage.getItem('veiculo_id');
-          }
+        // A6: o checklist órfão é a FONTE DE VERDADE do veículo daquela inspeção.
+        // Consultamos /checklist/pendente (motorista) ANTES de ler o localStorage:
+        // se houver órfão, o veículo dele SOBREPÕE qualquer veiculo_id stale (de
+        // teste/sessão anterior, que pode apontar p/ outro veículo) — senão o BDV
+        // abriria no veículo errado e o auto-link do backend vincularia o checklist
+        // à viagem do veículo errado. Sem órfão (404), mantém o localStorage
+        // (fluxo normal pós-selecao).
+        if (usuario.nivel_acesso === 'motorista') {
+          await hidratarDeChecklistPendente();
         }
 
+        const veiculoId = localStorage.getItem('veiculo_id');
         const placa     = localStorage.getItem('veiculo_atual') || '—';
         const modelo    = localStorage.getItem('modelo_veiculo') || placa;
 
@@ -502,11 +503,13 @@
       }
 
       // ─── A6: hidratar contexto do veículo a partir do checklist órfão ──
-      // Motorista que retorna sem localStorage (nova sessão após sair sem abrir
-      // o BDV). Busca /checklist/pendente (200 = órfão; 404 = nenhum), grava
-      // veiculo_id/placa/modelo no localStorage e reflete no cabeçalho. O KM é
+      // Busca /checklist/pendente (200 = órfão; 404 = nenhum). Quando há órfão, o
+      // veículo DELE é a fonte de verdade: SOBREPÕE incondicionalmente
+      // veiculo_id/placa/modelo no localStorage (descarta qualquer valor stale que
+      // poderia apontar p/ outro veículo) e reflete no cabeçalho. O KM é
       // pré-preenchido depois por preencherKmInicial (a partir do /veiculos).
-      // Retorna true se hidratou. Abrir o BDV reusa o auto-link do backend.
+      // Retorna true se hidratou; em 404 não toca no localStorage. Abrir o BDV
+      // reusa o auto-link do backend.
       async function hidratarDeChecklistPendente() {
         try {
           const res = await apiFetch('/checklist/pendente');
@@ -514,11 +517,13 @@
           const json = await res.json();
           const p = json && json.data;
           if (!p || !p.veiculo_id) return false;
+          const placa  = p.placa  || '';
+          const modelo = p.modelo || p.placa || '';
           localStorage.setItem('veiculo_id', String(p.veiculo_id));
-          if (p.placa)  localStorage.setItem('veiculo_atual', p.placa);
-          if (p.modelo) localStorage.setItem('modelo_veiculo', p.modelo);
-          document.getElementById('placa-display').textContent  = p.placa  || '—';
-          document.getElementById('modelo-display').textContent = p.modelo || p.placa || '—';
+          localStorage.setItem('veiculo_atual', placa);
+          localStorage.setItem('modelo_veiculo', modelo);
+          document.getElementById('placa-display').textContent  = placa  || '—';
+          document.getElementById('modelo-display').textContent = modelo || '—';
           return true;
         } catch (err) {
           if (err && err.isAuthRedirect) return false;
