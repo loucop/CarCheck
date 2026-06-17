@@ -235,7 +235,12 @@
     `coligada`/tenant para correções).
   - **Documentar apenas; implementar depois.**
 
-- ⬜ **A8 — `bdv.html` bug de ordenação: guard de veículo roda antes da checagem de viagem ativa**
+- 🔵 **A8 — `bdv.html` bug de ordenação: guard de veículo roda antes da checagem de viagem ativa** *(corrigido, pendente verificação no servidor)*
+  > **Fix implementado (2026-06-17), pendente deploy (arquivos estáticos) + reteste:** `verificarBDVAtivo()`
+  > virou o ponto de decisão no `DOMContentLoaded` (agora `await`ado). 200 (viagem ativa) → `andamento`,
+  > **sem** exigir `veiculo_id`. O guard de veículo foi extraído para `exigirVeiculoParaNovaViagem()` e
+  > roda **antes de qualquer saída para o estado 'abrir'** (404, fall-through não-200 e catch de erro) —
+  > nunca antes do `/bdv/ativo` resolver. Hidratação de órfão (A6) permanece antes da checagem.
   Um motorista **em viagem** com `localStorage.veiculo_id` vazio é mandado para `selecao.html`
   **antes** de `/bdv/ativo` ser checado — então ele **não consegue chegar à sua viagem ativa**.
   - **Repro:** abrir um BDV, limpar o `localStorage` (ou sessão/dispositivo novo), navegar para

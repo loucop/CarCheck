@@ -445,20 +445,17 @@
           await hidratarDeChecklistPendente();
         }
 
-        const veiculoId = localStorage.getItem('veiculo_id');
         const placa     = localStorage.getItem('veiculo_atual') || '—';
         const modelo    = localStorage.getItem('modelo_veiculo') || placa;
 
         document.getElementById('placa-display').textContent  = placa;
         document.getElementById('modelo-display').textContent = modelo;
 
-        if (!veiculoId) {
-          alert('Selecione um veículo antes de iniciar uma viagem.');
-          window.location.href = 'selecao.html';
-          return;
-        }
-
-        verificarBDVAtivo();
+        // A8: /bdv/ativo é o ponto de decisão. Uma viagem ativa (200) renderiza
+        // 'andamento' e NÃO exige veiculo_id; só os caminhos de nova viagem
+        // ('abrir') exigem veículo. `await` garante que o bounce p/ selecao não
+        // dispare antes de /bdv/ativo resolver (era o bug A8).
+        await verificarBDVAtivo();
       });
 
       function voltar() {
@@ -551,17 +548,25 @@
       }
 
       // ─── API: verificar BDV ativo ──────────────────────────────────
+      // A8: todo caminho que vai exibir o estado 'abrir' (nova viagem) precisa de
+      // contexto de veículo. Centraliza o guard: se veiculo_id estiver vazio, faz
+      // bounce p/ selecao e retorna false (o caller deve abortar). O estado
+      // 'andamento' (viagem ativa) NÃO passa por aqui — fica livre de guard.
+      function exigirVeiculoParaNovaViagem() {
+        if (!localStorage.getItem('veiculo_id')) {
+          alert('Selecione um veículo antes de iniciar uma viagem.');
+          window.location.href = 'selecao.html';
+          return false;
+        }
+        return true;
+      }
+
       async function verificarBDVAtivo() {
         mostrarEstado('loading');
         try {
           const res = await apiFetch('/bdv/ativo');
 
-          if (res.status === 404) {
-            await preencherKmInicial();
-            mostrarEstado('abrir');
-            return;
-          }
-
+          // Viagem ativa (200): renderiza 'andamento' sem exigir veiculo_id.
           if (res.ok) {
             const json = await res.json();
             bdvAtivo = json.data;
@@ -570,10 +575,16 @@
             return;
           }
 
+          // Qualquer não-200 (incl. 404) → caminho de NOVA viagem ('abrir'):
+          // guard de veículo antes de exibir o estado.
+          if (!exigirVeiculoParaNovaViagem()) return;
+          if (res.status === 404) await preencherKmInicial();
           mostrarEstado('abrir');
         } catch (err) {
           if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao verificar BDV ativo:', err);
+          // Fall-through de erro também leva a 'abrir' → mesmo guard.
+          if (!exigirVeiculoParaNovaViagem()) return;
           mostrarEstado('abrir');
         }
       }
