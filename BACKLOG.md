@@ -521,6 +521,12 @@
   estimar. Estimativas a priori (ex.: o cap de 500 KB do A4-H2) são tetos de validação, não o tamanho
   típico real — o payload medido foi ~1,1 kB. Relaciona-se ao A4-H2 (caps) e ao planejamento de M6.
 
+- ⬜ **B12 — `bdv.html` ignora `json.code` no fluxo de abrir BDV (sem auto-roteamento)**
+  `bdv.html` exibe as mensagens de `CHECKLIST_REQUIRED`/`VEHICLE_MISMATCH` via `alert()`, mas
+  **ignora o campo `json.code`** — não há roteamento automático (ex.: redirecionar para
+  `checklist.html` em `CHECKLIST_REQUIRED`, ou trocar o veículo em `VEHICLE_MISMATCH`). O motorista
+  é informado do que fazer, mas precisa navegar manualmente. **Nice-to-have de UX, não correção.**
+
 ---
 
 ## 🚀 Deploy em Produção (checklist)
