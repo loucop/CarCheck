@@ -257,6 +257,18 @@
   incluí-lo. Adicionar `authorize(MOTORISTA)` na rota e reconciliar o enum `ROLES`.
   - Liga-se ao trabalho role-aware de **A6/A7**.
 
+- ✅ **A10 — Vínculo estrito 1:1 checklist→BDV no `openBDV`** *(verificado no servidor 2026-06-17)*
+  > **✅ Verificado no servidor (2026-06-17):** sem checklist → **409 `CHECKLIST_REQUIRED`**;
+  > veículo divergente → **409 `VEHICLE_MISMATCH`**; checklist do mesmo veículo → **201** com o
+  > `checklist_id` corretamente vinculado.
+  O `openBDV` antes fazia auto-link **permissivo** (vinculava o checklist órfão do dia **se existisse**,
+  senão abria o BDV mesmo assim — podendo abrir no veículo errado). Agora o guard é **estrito**, dentro
+  da transação sob o row-lock do veículo: exige um checklist órfão do dia (`findPendingTodayByMatricula`,
+  agora também retornando `veiculo_id`) e compara `String(checklist.veiculo_id) === String(veiculo_id)`.
+  Dois códigos novos em `constants.js` (`CHECKLIST_REQUIRED`, `VEHICLE_MISMATCH`, ambos 409).
+  - Complementa, no backend, o override de hidratação do **A6** (que já evitava abrir o BDV no veículo
+    errado pelo lado do frontend). UX de auto-roteamento dessas mensagens fica no **B12**.
+
 ---
 
 ## 🟡 Médio
