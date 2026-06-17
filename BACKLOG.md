@@ -187,6 +187,14 @@
   >   com supressão de `isAuthRedirect`. **Pendente verificação no servidor** (deploy de arquivos
   >   estáticos — sem restart do backend): motorista que envia checklist e sai antes do BDV é roteado
   >   de volta a `bdv.html` e consegue abrir/encerrar o BDV; vistoriador não é afetado em nenhum caminho.
+  > - 🔧 **Fix override (2026-06-17) — pendente verificação no servidor:** a hidratação de `bdv.html`
+  >   agora trata o **checklist órfão como fonte da verdade do seu veículo** e **sobrepõe** qualquer
+  >   `localStorage.veiculo_id`/`veiculo_atual`/`modelo_veiculo` obsoleto (antes só hidratava quando o
+  >   localStorage estava vazio, podendo abrir o BDV no veículo errado). **Precisa deploy (arquivos
+  >   estáticos) + reteste.**
+  > - 🐞 **Bug de ordenação em `bdv.html` (a corrigir):** motorista em viagem com
+  >   `localStorage.veiculo_id` vazio é mandado para `selecao.html` **antes** da checagem `/bdv/ativo`.
+  >   **Fix:** consultar `/bdv/ativo` (e `/checklist/pendente`) **antes** de exigir `veiculo_id`.
   > - ⚠️ **Premissa da abordagem (a):** assume que o órfão é um checklist **legítimo** — a recuperação
   >   força o motorista a abrir/encerrar o BDV daquele checklist (único caminho de saída). A limpeza de
   >   **órfão equivocado** (descartar/corrigir sem forçar uma viagem) é uma preocupação de **vistoriador
