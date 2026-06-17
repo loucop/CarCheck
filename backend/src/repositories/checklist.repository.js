@@ -46,7 +46,7 @@ const checklistRepository = {
 
     async findPendingTodayByMatricula(conn, matricula) {
         const query = `
-            SELECT id FROM checklists
+            SELECT id, veiculo_id FROM checklists
             WHERE matricula = ?
               AND DATE(data_inspecao) = CURDATE()
               AND id NOT IN (SELECT checklist_id FROM bdv WHERE checklist_id IS NOT NULL)

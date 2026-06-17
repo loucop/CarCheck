@@ -47,11 +47,29 @@ const bdvService = {
                 };
             }
 
-            // Link today's unlinked checklist if one exists
+            // Require today's unlinked checklist and ensure it matches the chosen vehicle.
+            // Guard stays inside the transaction, under the vehicle row-lock above.
             const checklistPendente = await checklistRepository.findPendingTodayByMatricula(conn, data.matricula);
-            if (checklistPendente) {
-                data.checklist_id = checklistPendente.id;
+
+            // Case #1: no unlinked checklist for today — a checklist must precede the BDV
+            if (!checklistPendente) {
+                throw {
+                    message: 'É necessário concluir o checklist do veículo antes de abrir o BDV',
+                    code: ERROR_CODES.CHECKLIST_REQUIRED,
+                    statusCode: 409
+                };
             }
+
+            // Case #2: checklist belongs to a different vehicle than the one chosen for the BDV
+            if (String(checklistPendente.veiculo_id) !== String(data.veiculo_id)) {
+                throw {
+                    message: 'O checklist pendente é de outro veículo: abra o BDV para o veículo inspecionado',
+                    code: ERROR_CODES.VEHICLE_MISMATCH,
+                    statusCode: 409
+                };
+            }
+
+            data.checklist_id = checklistPendente.id;
 
             const bdvId = await bdvRepository.createBDV(conn, data);
             await veiculoRepository.updateStatus(conn, data.veiculo_id, 'em_uso');

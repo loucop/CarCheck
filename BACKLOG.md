@@ -250,6 +250,13 @@
   - Separado do **A6** (recuperação de órfão, já verificada): aqui o BDV **existe e está aberto**, mas
     a ordem dos guards em `bdv.html` impede chegar até ele.
 
+- ⬜ **A9 — `POST /api/bdv` sem `authorize`: qualquer usuário autenticado abre BDV**
+  `POST /api/bdv` tem apenas `authenticate`, **sem `authorize`** — qualquer usuário autenticado
+  (inclusive admin/vistoriador) consegue abrir um BDV. Além disso, o enum `ROLES`
+  (`utils/constants.js`) **não tem `VISTORIADOR`**, apesar de o enum `nivel_acesso` do banco
+  incluí-lo. Adicionar `authorize(MOTORISTA)` na rota e reconciliar o enum `ROLES`.
+  - Liga-se ao trabalho role-aware de **A6/A7**.
+
 ---
 
 ## 🟡 Médio
