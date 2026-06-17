@@ -92,9 +92,15 @@
   - Risco real de **vazamento/atribuição cruzada entre motoristas**; agrava-se sob multi-tenancy (M6),
     onde a matrícula precisa ser escopada por tenant. Relaciona-se a M4 (sessão via cookie) e M6.
 
-- ⬜ **A4 — Endurecimento de validação de input (Zod) — limites de tamanho e schemas frouxos**
+- ✅ **A4 — Endurecimento de validação de input (Zod) — limites de tamanho e schemas frouxos** *(concluído em 2026-06-17)*
   Auditoria de validação/injeção em 2026-06-15. Camada Zod (`validate.middleware.js`) sem caps de
-  tamanho e com schemas permissivos. **H2 corrigido (2026-06-16); M1–M4 e L1–L3 seguem pendentes.**
+  tamanho e com schemas permissivos.
+  > **✅ Concluído (2026-06-17), pendente verificação no servidor:** H2 (2026-06-16) + **M1–M4 e L1**
+  > implementados nesta sessão. Validado por 16 asserções de comportamento contra os payloads reais do
+  > frontend (parse OK; malformados rejeitados; drop do `matricula` no `createChecklist` preservado).
+  > **L2** já estava coberto pelos caps do H2; **L3** é o único sub-item não endereçado (aceito na
+  > escala atual — ver nota abaixo). **Reteste no servidor:** ciclo do motorista (checklist + BDV) e
+  > cadastro de funcionário continuam 201/200; payloads com chave extra → 400 nos schemas strict.
   - ✅ **H2 (alto) — sem `.max()` + `express.json({ limit: '50mb' })` = DoS/amplificação de armazenamento**
     *(corrigido em 2026-06-16)*. Payload real medido (checklist com avaria desenhada) ≈ 1,1 kB → caps
     apertados aplicados:
@@ -109,27 +115,29 @@
     - ✅ **Deployado e verificado no servidor (2026-06-16):** checklist normal grava **201**; campo de
       ~600 KB → **400** (cap Zod); body de 1,2 MB → **413 `PAYLOAD_TOO_LARGE`**; ciclo completo do
       motorista (checklist + abrir BDV / paradas / encerrar) funciona.
-  - **M1 — `itens_status: z.union([z.string().min(1), z.record(z.any())])` permissivo demais:** aceita
-    qualquer string OU objeto de chaves/valores arbitrários; sem validação da forma esperada
-    `{ item: { status, obs } }`. Render no admin escapa via `escHtml` (sem XSS/crash), mas o contrato
-    de dados não é imposto. **Ação:** validar a forma (ex.: `z.record(z.object({ status, obs }))`).
-  - **M2 — `mapa_avaria_base64` sem validação de formato no schema:** formato só é checado depois
-    (service `startsWith('data:image/')` + regex no render). **Ação:** validar data-URI/base64 no Zod.
-  - **M3 — campos de data/hora como `z.string()` cru:** `addParada.hora_saida`, `closeParada.hora_chegada`,
-    `relatorioBDV.data_inicio`/`data_fim` sem formato ISO/datetime. Parametrizados (sem injeção), mas
-    valores malformados geram resultado silenciosamente errado em `data_abertura >= ?`. **Ação:** validar
-    formato (ex.: `z.coerce.date()` ou regex ISO).
-  - **M4 — `coligada` inconsistente:** enum `['angels','cemax']` em `createFuncionario`/`openBDV`, mas
-    `z.string().optional()` livre em `relatorioBDV`. **Ação:** unificar no enum.
-  - **L1 — nenhum schema usa `.strict()`:** chaves desconhecidas são **descartadas** (default do Zod),
-    não rejeitadas (overposting tolerado). ⚠️ **Tradeoff:** a correção do **A3 depende desse descarte**
-    (um `matricula` no body é dropado) — aplicar `.strict()` passaria a **400** essas requisições.
-    Decidir por schema.
-  - **L2 — sem `.max()` em `login`/`createFuncionario`:** `senha` sem teto (bcrypt lê só 72 bytes →
-    trabalho desperdiçado, não quebra); `nome`/`matricula` sem teto podem estourar a coluna do banco
-    (500 em vez de 400 limpo).
-  - **L3 — `migrate-passwords.js` carrega todas as linhas sem `WHERE`** — ok na escala atual; revisitar
-    se `funcionarios` crescer. (O problema grave do script está em **A5**.)
+  - ✅ **M1 — forma de `itens_status` validada** *(2026-06-17)*: branch record agora é
+    `z.record(z.object({ status: z.string(), obs: z.string().optional() }))`. Permissivo nas chaves
+    (qualquer nome de item) e no `status` (string, não enum → não rejeita variação legada); `z.object`
+    interno não-strict tolera chaves extras. Branch string mantido (`min(1).max(20000)`).
+  - ✅ **M2 — formato de `mapa_avaria_base64` no schema** *(2026-06-17)*:
+    `.regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/)` (mesmo formato do render do admin);
+    `.max(500000)` e `.optional()` mantidos.
+  - ✅ **M3 — campos de data/hora validados** *(2026-06-17)*: `DATETIME_RE` compartilhado em
+    `addParada.hora_saida`, `closeParada.hora_chegada`, `relatorioBDV.data_inicio`/`data_fim`. Aceita
+    `YYYY-MM-DD` (input type=date) e `YYYY-MM-DDTHH:mm[:ss][.fff][Z|±hh:mm]` (datetime-local / ISO),
+    lenient p/ não quebrar o frontend; `.max(32)` mantido como teto.
+  - ✅ **M4 — `coligada` unificada** *(2026-06-17)*: `relatorioBDV.coligada` passou de
+    `z.string().max(20)` para `z.enum(['angels','cemax'])`, mantido `.optional()` (é filtro).
+  - ✅ **L1 — `.strict()` decidido por schema** *(2026-06-17)*: **strict (9):** `login`,
+    `createFuncionario`, `historicoVeiculo`, `openBDV`, `addParada`, `closeParada`, `closeBDV`,
+    `bdvParams`, `paradaParams`. **Não-strict (3):** `createChecklist` (**obrigatório** — A3 depende do
+    drop do `matricula` do body; comentado inline), `relatorioAdmin` e `relatorioBDV` (schemas de
+    **query** — toleram parâmetros avulsos da query string).
+  - ✅ **L2 — já coberto pelo H2:** os caps de `.max()` em `login`/`createFuncionario`
+    (`senha` 128, `matricula` 20, `nome` 120) foram aplicados no H2 (2026-06-16). Nada a fazer.
+  - ⬜ **L3 — `migrate-passwords.js` carrega todas as linhas sem `WHERE`** — **único sub-item não
+    endereçado.** Fora do escopo desta mudança (`validate.middleware.js`); ok na escala atual, revisitar
+    se `funcionarios` crescer. (O problema grave do script foi resolvido em **A5**.)
 
 - ✅ **A5 — `scripts/migrate-passwords.js` está quebrado e é destrutivo de dados** *(corrigido em 2026-06-16)*
   > ✅ **Reconciliado e endurecido (2026-06-16).** O script foi reescrito:
