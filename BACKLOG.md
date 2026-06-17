@@ -250,8 +250,12 @@
   - Separado do **A6** (recuperação de órfão, já verificada): aqui o BDV **existe e está aberto**, mas
     a ordem dos guards em `bdv.html` impede chegar até ele.
 
-- 🔵 **A9 — `POST /api/bdv` sem `authorize`: qualquer usuário autenticado abre BDV** *(implementado, pendente verificação no servidor)*
-  > **Fix implementado (2026-06-17), pendente deploy + reteste:** `VISTORIADOR: 'vistoriador'`
+- ✅ **A9 — `POST /api/bdv` sem `authorize`: qualquer usuário autenticado abre BDV** *(verificado no servidor 2026-06-17)*
+  > **✅ Verificado no servidor (2026-06-17):** modelo de três papéis aplicado na camada de rota —
+  > motorista chega ao `GET /bdv/ativo` (**404**, não bloqueado); admin e vistoriador recebem
+  > **403 `INSUFFICIENT_PERMISSION`** nas rotas de motorista; admin ainda acessa o `admin-bdv.html`
+  > via `GET /bdv/:id` sem gate (guard admin-OU-dono no service).
+  > **Fix implementado (2026-06-17):** `VISTORIADOR: 'vistoriador'`
   > adicionado ao enum `ROLES` (`constants.js`), reconciliando com o enum `nivel_acesso` do banco.
   > Gates `authorize` (após `authenticate`) em `routes/index.js`: `POST /bdv`, `GET /bdv/ativo`,
   > `POST /bdv/:id/paradas`, `PATCH /bdv/:id/paradas/:paradaId`, `PATCH /bdv/:id/encerrar` →
