@@ -171,7 +171,12 @@
   `limit`/`offset` do `findAllBDV`). Sem template literals com input interpolado e sem caminho de
   injeção de segunda ordem. A regra "só repositórios tocam SQL" (CLAUDE.md) está sendo mantida.
 
-- 🔵 **A6 — Soft-lock do motorista após checklist-sem-BDV** *(abordagem (a), escopo motorista — implementado, pendente verificação no servidor)*
+- ✅ **A6 — Soft-lock do motorista após checklist-sem-BDV** *(abordagem (a), escopo motorista — verificado no servidor 2026-06-17)*
+  > **✅ Verificado no servidor (2026-06-17):** órfão fresco do mesmo dia roteia o motorista para
+  > `bdv.html`, hidrata o **veículo CORRETO** (override de data-integrity confirmado — mostrou o veículo
+  > do órfão, não o `localStorage` obsoleto), o lock se mantém até o BDV ser concluído e **libera** após
+  > o encerramento. **Ciclo completo funciona.**
+  >
   > **Progresso (2026-06-16):** implementado em duas fatias.
   > - ✅ **Slice 1 (backend) — feito:** novo `GET /api/checklist/pendente` (repo
   >   `findPendingDetailTodayByMatricula` com JOIN veiculos → `id, veiculo_id, km_entrada, placa, modelo`;
