@@ -4,6 +4,7 @@
 
 const ROLES = {
     ADMIN: 'admin',
+    VISTORIADOR: 'vistoriador',
     MOTORISTA: 'motorista'
 };
 

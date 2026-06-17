@@ -84,6 +84,7 @@ router.get(
 router.post(
     '/checklist',
     authenticate,
+    authorize(ROLES.MOTORISTA, ROLES.VISTORIADOR),  // A9: motorista e vistoriador inspecionam; admin não
     validate(schemas.createChecklist),
     checklistController.createChecklist
 );
@@ -96,6 +97,7 @@ router.post(
 router.get(
     '/checklist/pendente',
     authenticate,
+    authorize(ROLES.MOTORISTA),  // A9: recuperação de órfão é escopada ao motorista (A6)
     checklistController.getPendente
 );
 
@@ -110,6 +112,7 @@ router.get(
 router.post(
     '/bdv',
     authenticate,
+    authorize(ROLES.MOTORISTA),  // A9: só motorista abre BDV (admin audita; checklist de vistoriador é estado final, sem BDV)
     validate(schemas.openBDV),
     bdvController.open
 );
@@ -121,6 +124,7 @@ router.post(
 router.get(
     '/bdv/ativo',
     authenticate,
+    authorize(ROLES.MOTORISTA),  // A9: "BDV ativo do motorista" — só motorista tem um
     bdvController.getAtivo
 );
 
@@ -131,6 +135,8 @@ router.get(
 router.get(
     '/bdv/:id',
     authenticate,
+    // A9: sem authorize de propósito — o service (getBDV) já faz guard admin-OU-dono.
+    // Um gate de role grosseiro aqui correria o risco de trancar o admin para fora.
     validate(schemas.bdvParams, 'params'),
     bdvController.findById
 );
@@ -142,6 +148,9 @@ router.get(
 router.post(
     '/bdv/:id/paradas',
     authenticate,
+    // A9: escrita de BDV — só motorista (service já faz guard de dono).
+    // A7-coupled: pode ganhar VISTORIADOR quando o papel de override/supervisor entrar.
+    authorize(ROLES.MOTORISTA),
     validate(schemas.bdvParams, 'params'),
     validate(schemas.addParada),
     bdvController.addParada
@@ -154,6 +163,9 @@ router.post(
 router.patch(
     '/bdv/:id/paradas/:paradaId',
     authenticate,
+    // A9: escrita de BDV — só motorista (service já faz guard de dono).
+    // A7-coupled: pode ganhar VISTORIADOR quando o papel de override/supervisor entrar.
+    authorize(ROLES.MOTORISTA),
     validate(schemas.paradaParams, 'params'),
     validate(schemas.closeParada),
     bdvController.closeParada
@@ -166,6 +178,9 @@ router.patch(
 router.patch(
     '/bdv/:id/encerrar',
     authenticate,
+    // A9: escrita de BDV — só motorista (service já faz guard de dono).
+    // A7-coupled: pode ganhar VISTORIADOR quando o papel de override/supervisor entrar.
+    authorize(ROLES.MOTORISTA),
     validate(schemas.bdvParams, 'params'),
     validate(schemas.closeBDV),
     bdvController.close
