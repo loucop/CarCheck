@@ -197,9 +197,6 @@
   >   `localStorage.veiculo_id`/`veiculo_atual`/`modelo_veiculo` obsoleto (antes só hidratava quando o
   >   localStorage estava vazio, podendo abrir o BDV no veículo errado). **Precisa deploy (arquivos
   >   estáticos) + reteste.**
-  > - 🐞 **Bug de ordenação em `bdv.html` (a corrigir):** motorista em viagem com
-  >   `localStorage.veiculo_id` vazio é mandado para `selecao.html` **antes** da checagem `/bdv/ativo`.
-  >   **Fix:** consultar `/bdv/ativo` (e `/checklist/pendente`) **antes** de exigir `veiculo_id`.
   > - ⚠️ **Premissa da abordagem (a):** assume que o órfão é um checklist **legítimo** — a recuperação
   >   força o motorista a abrir/encerrar o BDV daquele checklist (único caminho de saída). A limpeza de
   >   **órfão equivocado** (descartar/corrigir sem forçar uma viagem) é uma preocupação de **vistoriador
@@ -237,6 +234,16 @@
     relaciona ao controle de acesso por objeto (A3) e ao planejamento multi-tenant (M6, escopo de
     `coligada`/tenant para correções).
   - **Documentar apenas; implementar depois.**
+
+- ⬜ **A8 — `bdv.html` bug de ordenação: guard de veículo roda antes da checagem de viagem ativa**
+  Um motorista **em viagem** com `localStorage.veiculo_id` vazio é mandado para `selecao.html`
+  **antes** de `/bdv/ativo` ser checado — então ele **não consegue chegar à sua viagem ativa**.
+  - **Repro:** abrir um BDV, limpar o `localStorage` (ou sessão/dispositivo novo), navegar para
+    `bdv.html` → é jogado para `selecao.html` em vez da viagem ativa.
+  - **Fix:** checar `/bdv/ativo` (e `/checklist/pendente`) **antes** de exigir `veiculo_id`, de modo
+    que uma viagem ativa ou um órfão seja detectado antes do guard de contexto de veículo rodar.
+  - Separado do **A6** (recuperação de órfão, já verificada): aqui o BDV **existe e está aberto**, mas
+    a ordem dos guards em `bdv.html` impede chegar até ele.
 
 ---
 
