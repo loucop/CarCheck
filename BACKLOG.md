@@ -250,7 +250,18 @@
   - Separado do **A6** (recuperação de órfão, já verificada): aqui o BDV **existe e está aberto**, mas
     a ordem dos guards em `bdv.html` impede chegar até ele.
 
-- ⬜ **A9 — `POST /api/bdv` sem `authorize`: qualquer usuário autenticado abre BDV**
+- 🔵 **A9 — `POST /api/bdv` sem `authorize`: qualquer usuário autenticado abre BDV** *(implementado, pendente verificação no servidor)*
+  > **Fix implementado (2026-06-17), pendente deploy + reteste:** `VISTORIADOR: 'vistoriador'`
+  > adicionado ao enum `ROLES` (`constants.js`), reconciliando com o enum `nivel_acesso` do banco.
+  > Gates `authorize` (após `authenticate`) em `routes/index.js`: `POST /bdv`, `GET /bdv/ativo`,
+  > `POST /bdv/:id/paradas`, `PATCH /bdv/:id/paradas/:paradaId`, `PATCH /bdv/:id/encerrar` →
+  > `authorize(MOTORISTA)`; `POST /checklist` → `authorize(MOTORISTA, VISTORIADOR)` (admin não
+  > inspeciona); `GET /checklist/pendente` → `authorize(MOTORISTA)`. `GET /bdv/:id` fica só com
+  > `authenticate` (o service já faz guard admin-OU-dono — gate grosseiro trancaria o admin).
+  > As rotas de **escrita de BDV** (`paradas`, `encerrar`) estão marcadas **A7-coupled**: podem
+  > ganhar `VISTORIADOR` quando o papel de override/supervisor entrar.
+  > **Reteste:** motorista abre/registra parada/encerra normalmente; admin/vistoriador recebem
+  > **403** nas rotas de BDV de motorista; checklist funciona p/ motorista e vistoriador.
   `POST /api/bdv` tem apenas `authenticate`, **sem `authorize`** — qualquer usuário autenticado
   (inclusive admin/vistoriador) consegue abrir um BDV. Além disso, o enum `ROLES`
   (`utils/constants.js`) **não tem `VISTORIADOR`**, apesar de o enum `nivel_acesso` do banco
