@@ -230,20 +230,165 @@
     checklist→BDV **role-aware**, de modo que checklists de vistoriador não disparem o soft-lock nem
     exijam um BDV.
 
-- ⬜ **A7 — Capacidades de correção/override do vistoriador (papel de supervisor)**
+- 🟢 **A7 — Capacidades de correção/override do vistoriador (papel de supervisor)** *(desenhado 2026-06-18; pronto para implementar)*
   O papel **vistoriador** deve poder: **(1)** definir/corrigir qualquer valor de **KM**, inclusive
   **sobrepondo a validação de monotonicidade do KM** (caso um motorista tenha digitado errado); e
   **(2)** sinalizar e corrigir uma gama de erros em **checklists/BDVs**. É um papel de **override de
-  nível supervisor**, distinto de **motorista**.
-  - **Requer:**
-    - **Modelo de permissão** para quem pode burlar o lock `SELECT ... FOR UPDATE` de KM / o guard de
-      monotonicidade (ver `checklist.service.js` e `bdv.service.js` — validação `km >= km_atual`).
-    - **Trilha de auditoria** do que o vistoriador alterou: **quem / quando / valor antigo → novo**.
-    - **UI** para o fluxo de correção.
+  nível supervisor**, distinto de **motorista**. Esta é a **especificação autoritativa de implementação**
+  (substitui o placeholder "documentar apenas").
+
+  ### Onde o guard de KM mora hoje (4 checagens, não 1)
+  A monotonicidade não é uma checagem única — todas se ancoram em `veiculos.km_atual`, mutado sob
+  `findByIdWithLock` (`SELECT … FOR UPDATE`):
+  - `checklist.service.createChecklist` — `km_entrada < km_atual` → `KM_INVALID`; escreve `updateKm(km_entrada)`.
+  - `bdv.service.openBDV` — `km_inicial < km_atual`; escreve `updateKm(km_inicial)`.
+  - `bdv.service.addParada` — `km < lastParada.km` **e** `km < km_inicial`.
+  - `bdv.service.closeBDV` — `km_final < km_inicial` **e** `km_final < maxParadaKm`; escreve `updateKm(km_final)`.
+
+  `veiculos.km_atual` é a **âncora monotônica canônica**. Toda correção que mexe em KM precisa tratar
+  `km_atual` como campo corrigível de primeira classe — corrigir o KM de um registro sem realinhar a
+  âncora deixa o piso da próxima submissão de motorista errado.
+
+  ### (2) Trilha de auditoria — requisito central. Esquema de **duas tabelas** (decisão §6.4)
+  Cabeçalho + diff por campo. Uma ação de correção = 1 linha de cabeçalho + N linhas de campo (um
+  único `motivo` e timestamp, mas consultável por campo). **Append-only** (sem `UPDATE`/`DELETE` no
+  repositório; idealmente o usuário de banco do app só recebe `INSERT`/`SELECT` nessas tabelas).
+  Schema aplicado **manualmente** (sem arquivo de migration — convenção do projeto).
+
+  ```sql
+  -- Cabeçalho: uma linha por ação de correção (quem / quando / qual registro / por quê)
+  CREATE TABLE correcoes (
+      id                    BIGINT       NOT NULL AUTO_INCREMENT,
+      vistoriador_matricula VARCHAR(20)  NOT NULL,            -- quem (FK funcionarios.matricula)
+      entidade              ENUM('checklist','bdv','bdv_parada','veiculo') NOT NULL,
+      entidade_id           BIGINT       NOT NULL,            -- qual registro
+      motivo                VARCHAR(500) NULL,                -- justificativa (ver §6.3)
+      km_override           TINYINT(1)   NOT NULL DEFAULT 0,  -- true se a monotonicidade foi burlada
+      coligada              VARCHAR(20)  NULL,                -- escopo de tenant (M6)
+      criado_em             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY idx_entidade (entidade, entidade_id),
+      KEY idx_vistoriador (vistoriador_matricula),
+      KEY idx_criado_em (criado_em),
+      CONSTRAINT fk_correcoes_func FOREIGN KEY (vistoriador_matricula)
+          REFERENCES funcionarios (matricula)
+  );
+
+  -- Detalhe: uma linha por campo alterado
+  CREATE TABLE correcoes_campos (
+      id            BIGINT      NOT NULL AUTO_INCREMENT,
+      correcao_id   BIGINT      NOT NULL,
+      campo         VARCHAR(64) NOT NULL,                     -- ex.: 'km_entrada', 'combustivel_retorno'
+      valor_antigo  TEXT        NULL,                         -- snapshot antes (string/JSON)
+      valor_novo    TEXT        NULL,                         -- snapshot depois
+      PRIMARY KEY (id),
+      KEY idx_correcao (correcao_id),
+      CONSTRAINT fk_campos_correcao FOREIGN KEY (correcao_id)
+          REFERENCES correcoes (id)
+  );
+  ```
+
+  Decisões embutidas:
+  - **`valor_antigo`/`valor_novo` como TEXT, não tipados** — a mesma tabela audita `km` numérico,
+    `status` enum e `itens_status` JSON. Guarda o snapshot literal; para JSON guarda o blob serializado
+    inteiro (sem diff interno — isso fica na UI).
+  - **`km_override` no cabeçalho** — torna "o vistoriador quebrou a monotonicidade de propósito" um
+    evento filtrável de primeira classe, distinto de um conserto de campo de rotina.
+  - **`coligada` desnormalizada no cabeçalho** — auditoria escopada por tenant (M6) sem join de volta
+    pelo registro corrigido (cujo `coligada` pode ter sido o campo corrigido).
+  - **Append-only** — o modo de falha a projetar para fora é a auditoria corrigindo a auditoria.
+
+  ### (3) Caminho de escrita separado: `correcao.service.js` (sem guard monotônico)
+  **Princípio: NÃO adicionar `if (role === vistoriador) skip guard` dentro dos services do motorista.**
+  Isso entrelaça dois papéis num mesmo caminho e faz um bug na checagem de papel desativar o guard para
+  todos. Em vez disso:
+  - **Caminho de escrita separado** — novo `correcao.service.js` com métodos próprios
+    (`corrigirChecklist`, `corrigirBDV`, `corrigirParada`, `corrigirKmVeiculo`). Esses métodos
+    **simplesmente nunca chamam a checagem monotônica** — o bypass é a *ausência* do guard num caminho
+    diferente e gated por papel, não um condicional dentro do caminho guardado. `checklist.service` /
+    `bdv.service` ficam **intocados** — o fluxo do motorista fica comprovadamente inalterado.
+  - **Disciplina de transação + lock preservada** — correções que tocam KM ainda fazem
+    `findByIdWithLock` na linha do veículo e rodam dentro de `beginTransaction`/`commit`.
+  - **Regra de auditoria na mesma transação** — o `INSERT` de auditoria acontece **na mesma transação**
+    da correção: se a escrita de auditoria falhar, a correção sofre `rollback`. **Sem edições silenciosas.**
+
+  ### (1) Modelo de permissão — gate no nível de rota
+  - **`authorize(ROLES.VISTORIADOR, ROLES.ADMIN)`** em todas as rotas `/api/correcoes/*` (espelha a
+    decisão "gate na rota" do A9, mantendo o gate visível em `routes/index.js`). A resposta a "quem pode
+    quebrar a monotonicidade?" fica inteiramente em dois lugares: o `authorize(VISTORIADOR, ADMIN)` da
+    rota e a existência de `correcao.service`.
+  - **Não** alargar o `authorize` das rotas de motorista (apesar do comentário `A7-coupled` nelas) — as
+    rotas de motorista impõem ownership + monotonicidade, que é exatamente o que uma correção **não**
+    deve fazer. Correções vivem no namespace dedicado `/correcoes/*`.
+
+  ### (4) Campos corrigíveis vs. imutáveis
+  **Corrigíveis (com auditoria):**
+  - `checklists`: `km_entrada`, `itens_status`, `local_origem`, `local_destino`, `mapa_avaria_base64`.
+  - `bdv`: `km_inicial`, `km_final`, `combustivel_retorno`, `coligada`, `encerrado_fora_base`.
+  - `bdv_paradas`: `km`, `hora_saida`, `hora_chegada`, `local_saida`, `local_chegada`, `observacao`.
+  - `veiculos`: `km_atual` (a âncora).
+
+  **Imutáveis (nunca editáveis, nem pelo vistoriador):**
+  - **Chaves primárias** (`id` em toda tabela).
+  - **Procedência `matricula` / `veiculo_id`** — *quem* fez e *qual veículo*. Corrigir "motorista errado"
+    ou "veículo errado" re-parenteia o registro; fica **fora de escopo** (eventual operação "reassign"
+    separada e mais pesada, não uma edição de campo).
+  - **`bdv.checklist_id`** — o vínculo 1:1 checklist→BDV imposto pelo A10. Estrutural, imutável.
+  - **Timestamps de sistema** `data_abertura` / `data_encerramento` — carimbados pelo sistema; imutáveis.
+  - **`bdv.status`** — **§6.1: imutável.** Correções são **field-only**; **não há reabertura** de BDV
+    encerrado (`encerrado`→`aberto`) via correção. Reabrir é materialmente diferente de consertar um campo.
+  - **As próprias tabelas de auditoria.**
+
+  ### §6 — Decisões resolvidas (2026-06-18)
+  - **§6.1 — `bdv.status` imutável / correções field-only, sem reabertura.** Sem transição
+    `encerrado`→`aberto` pela correção.
+  - **§6.2 — Realinhamento de âncora: set explícito + helper de recompute, sem auto-recompute.** Quando
+    uma correção muda o KM do registro que hoje define `km_atual`, o vistoriador **seta explicitamente** a
+    âncora via `PATCH /api/correcoes/veiculo/:id/km` (sob o row-lock). Um **helper de recompute**
+    (`km_atual = MAX(último checklist km_entrada, último BDV encerrado km_final)`) fica disponível como
+    apoio, mas **não** dispara automaticamente — a âncora é sempre uma decisão explícita e auditada.
+  - **§6.3 — `motivo` obrigatório quando `km_override = 1`, opcional caso contrário.** Override de KM
+    exige justificativa; consertos comuns de campo, não.
+  - **§6.4 — Auditoria em duas tabelas** (`correcoes` + `correcoes_campos`), conforme schema acima.
+
+  ### Pré-requisito — mudança deliberada de controle de acesso
+  O vistoriador **precisa de acesso de leitura aos dashboards de auditoria**, hoje `authorize(ADMIN)`
+  apenas (`GET /api/admin/relatorio`, `GET /api/admin/bdv`). O vistoriador não pode corrigir o que não
+  vê. Decisão deliberada: **relaxar esses gates de GET para incluir `VISTORIADOR`** (ou adicionar
+  endpoints de relatório escopados ao vistoriador). Tratar como mudança de access-control explícita —
+  reconciliar com A3 (acesso por objeto) e M6 (escopo de `coligada`/tenant).
+
+  ### Superfície de API (novos endpoints)
+  Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; o middleware CSRF já cobre
+  métodos de mutação.
+
+  | Método | Path | Propósito |
+  |--------|------|-----------|
+  | PATCH | `/api/correcoes/checklist/:id` | Corrigir campos do checklist (body: campos alterados + `motivo`) |
+  | PATCH | `/api/correcoes/bdv/:id` | Corrigir campos do BDV |
+  | PATCH | `/api/correcoes/bdv/:id/paradas/:paradaId` | Corrigir uma parada |
+  | PATCH | `/api/correcoes/veiculo/:id/km` | Setar a âncora de KM do veículo (§6.2) |
+  | GET | `/api/correcoes?entidade=&entidade_id=` | Ler o histórico de correções de um registro |
+
+  ### UI (alto nível)
+  - Acesso de leitura do vistoriador aos dashboards de auditoria (pré-requisito acima).
+  - Afordância "Correção" em cada registro nas telas de auditoria (gated em
+    `usuario.nivel_acesso in (vistoriador, admin)` no front, seguindo o padrão de papel via localStorage).
+    Abre um formulário pré-preenchido.
+  - No salvar: **mostrar o diff** (antigo → novo por campo) e **exigir `motivo`** quando aplicável; uma
+    edição de KM que quebra a monotonicidade mostra confirmação explícita de "override" que seta `km_override`.
+  - **Timeline de auditoria por registro** (lê `GET /api/correcoes`) — quem mudou o quê, quando e por quê.
+
+  ### Fatiamento de entrega
+  1. **Tabelas de auditoria + `correcao.service` + endpoints PATCH** (checklist/bdv/parada) com gate
+     `authorize(VISTORIADOR, ADMIN)` e regra de auditoria-na-mesma-transação.
+  2. **Realinhamento de âncora** — `PATCH /correcoes/veiculo/:id/km` + helper de recompute (§6.2).
+  3. **Endpoint de histórico** — `GET /api/correcoes` + pré-requisito de leitura dos dashboards.
+  4. **UI** — afordância de correção, diff + `motivo`, timeline de auditoria.
+
   - Liga-se ao trabalho **role-aware** de checklist/BDV da nota de vistoriador do **A6**. Também se
     relaciona ao controle de acesso por objeto (A3) e ao planejamento multi-tenant (M6, escopo de
     `coligada`/tenant para correções).
-  - **Documentar apenas; implementar depois.**
 
 - 🔵 **A8 — `bdv.html` bug de ordenação: guard de veículo roda antes da checagem de viagem ativa** *(corrigido, pendente verificação no servidor)*
   > **Fix implementado (2026-06-17), pendente deploy (arquivos estáticos) + reteste:** `verificarBDVAtivo()`
