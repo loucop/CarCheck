@@ -92,15 +92,17 @@
   - Risco real de **vazamento/atribuição cruzada entre motoristas**; agrava-se sob multi-tenancy (M6),
     onde a matrícula precisa ser escopada por tenant. Relaciona-se a M4 (sessão via cookie) e M6.
 
-- ✅ **A4 — Endurecimento de validação de input (Zod) — limites de tamanho e schemas frouxos** *(concluído em 2026-06-17)*
+- ✅ **A4 — Endurecimento de validação de input (Zod) — limites de tamanho e schemas frouxos** *(concluído em 2026-06-17; verificado no servidor em 2026-06-18)*
   Auditoria de validação/injeção em 2026-06-15. Camada Zod (`validate.middleware.js`) sem caps de
   tamanho e com schemas permissivos.
-  > **✅ Concluído (2026-06-17), pendente verificação no servidor:** H2 (2026-06-16) + **M1–M4 e L1**
-  > implementados nesta sessão. Validado por 16 asserções de comportamento contra os payloads reais do
+  > **✅ Concluído (2026-06-17) e verificado no servidor (2026-06-18):** H2 (2026-06-16) + **M1–M4 e L1**
+  > implementados. Validado por 16 asserções de comportamento contra os payloads reais do
   > frontend (parse OK; malformados rejeitados; drop do `matricula` no `createChecklist` preservado).
+  > **Verificação no servidor (2026-06-18):** checklist real submetido pela UI retorna **201** com a
+  > validação de forma do M1, o formato base64 do M2 e o caminho não-strict do A3 (drop do `matricula`)
+  > todos ativos em produção.
   > **L2** já estava coberto pelos caps do H2; **L3** é o único sub-item não endereçado (aceito na
-  > escala atual — ver nota abaixo). **Reteste no servidor:** ciclo do motorista (checklist + BDV) e
-  > cadastro de funcionário continuam 201/200; payloads com chave extra → 400 nos schemas strict.
+  > escala atual — ver nota abaixo).
   - ✅ **H2 (alto) — sem `.max()` + `express.json({ limit: '50mb' })` = DoS/amplificação de armazenamento**
     *(corrigido em 2026-06-16)*. Payload real medido (checklist com avaria desenhada) ≈ 1,1 kB → caps
     apertados aplicados:
