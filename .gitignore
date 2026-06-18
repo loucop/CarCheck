@@ -1,6 +1,7 @@
 backend/node_modules/
 backend/.env
 backend/public/uploads/
+backend/logs/
 .DS_Store
 Thumbs.db
 *.log

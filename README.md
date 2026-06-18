@@ -131,6 +131,105 @@ For development with auto-restart:
 
 ---
 
+## Running as a Windows Service
+
+In production the backend must survive terminal close, auto-restart on crash,
+**and** come back up after the server reboots. This is handled by **PM2** in two
+stages — Part A gets the process managed and crash-resilient immediately; Part B
+closes the reboot gap. The process definition lives in `ecosystem.config.js` at
+the repo root (fork mode, `cwd: ./backend`, restart policy, logs under
+`backend/logs/` — no secrets; they stay in `backend/.env`).
+
+> ⚠️ **Read this first — the two caveats that break PM2 on Windows:**
+>
+> 1. **Pin `PM2_HOME`.** Set it to a fixed path (`C:\ProgramData\pm2`) for
+>    **every** PM2 command below. PM2 stores its saved process list and logs
+>    under `PM2_HOME`; if the value drifts between commands, the service won't
+>    find the apps you saved.
+> 2. **Same account for `pm2 save` and the service.** The `pm2 save` snapshot is
+>    resurrected on boot by the Windows Service. The service **must run under the
+>    same account that ran `pm2 save`** (and that account needs `node` + `pm2` on
+>    its `PATH`). If they differ, the service starts an empty PM2 with nothing to
+>    resurrect. Run everything below as that account (e.g. Administrator).
+
+### Part A — Process management
+
+Gets you terminal-close survival + crash auto-restart right away.
+
+**1. Install PM2 (run as Administrator):**
+
+    npm install -g pm2
+
+**2. Pin PM2_HOME (machine-wide, then for this session):**
+
+    setx PM2_HOME "C:\ProgramData\pm2" /M
+    set PM2_HOME=C:\ProgramData\pm2
+
+`setx ... /M` writes the machine-wide variable so the service (Part B) sees it on
+boot; `set` applies it to the current shell so the commands below use the same home.
+
+**3. Start the app and save the process list:**
+
+    cd C:\path\to\CarCheck
+    pm2 start ecosystem.config.js
+    pm2 status                       # confirm carcheck-api is "online"
+    pm2 save                         # snapshot for resurrect-on-boot (used by Part B)
+
+**4. Log rotation (PM2 is chatty — cap disk usage):**
+
+    pm2 install pm2-logrotate
+    pm2 set pm2-logrotate:max_size 10M
+    pm2 set pm2-logrotate:retain 14
+
+Live tail when troubleshooting:
+
+    pm2 logs carcheck-api
+
+At this point the backend survives terminal close and auto-restarts on crash.
+It does **not** yet survive a reboot — continue to Part B.
+
+### Part B — Reboot persistence
+
+This server **auto-reboots on its own** (hardware/scheduled), but the Node
+process does **not** come back by itself after one — PM2's own startup hook is
+not supported on Windows. **pm2-windows-service** closes that gap by running the
+PM2 daemon as a true Windows Service that starts at boot (no login required) and
+resurrects the `pm2 save` snapshot from Part A. Without Part B, the app stays
+down after every reboot.
+
+**1. Install the service wrapper (run as Administrator):**
+
+    npm install -g pm2-windows-service
+
+**2. Install the PM2 Windows Service:**
+
+    pm2-service-install -n PM2
+
+Accept the prompts. This registers the PM2 daemon as a service that resurrects
+the saved process list at boot. Ensure the service runs under the **same
+account** that ran `pm2 save` in Part A (see caveat above).
+
+### Verification — rides the next natural reboot
+
+No need to force a reboot: this server reboots on its own, so verification piggy-backs
+on the **next natural reboot**. After it happens, **without starting anything manually**,
+open a shell (with `PM2_HOME=C:\ProgramData\pm2`) and run:
+
+    pm2 status
+
+Confirm **`carcheck-api` shows `online`** with a **fresh uptime** — i.e. the
+service auto-started it after the reboot, not you. Also hit the health endpoint:
+
+    curl http://localhost:3000/api/health
+
+It must return `{"success":true,...,"status":"online"}`.
+
+If `pm2 status` is empty or the app is `stopped`/`errored` after a reboot, the
+**same-account / `PM2_HOME`** caveat was not satisfied — re-run Part A step 2–3
+and Part B as the account the service runs under.
+
+---
+
 ## License
 
 This project is proprietary software.

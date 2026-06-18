@@ -679,10 +679,27 @@
   HTML estático + 46 gerados em `admin.js`) e os ~652 linhas de blocos `<style>` para classes
   em `style.css`. Maior esforço; ganho cosmético/defesa-em-profundidade, não fecha exploit ativo.
 
-- ⬜ **B8 — Gerenciamento de processo (PM2 ou serviço do Windows)**
+- 🟢 **B8 — Gerenciamento de processo (PM2 + serviço do Windows)** *(implementado 2026-06-18; Parte A deployável já, Parte B pendente de verificação)*
   Hoje o backend morre quando o terminal é fechado e não reinicia sozinho após crash. Configurar
   **PM2** (ou um serviço do Windows) para manter o processo vivo, reiniciar em falha e subir no boot.
   Correção rápida (~30 min). **Obrigatório antes do deploy público.**
+  > **✅ Implementado (2026-06-18):** `ecosystem.config.js` na raiz (fork mode — o rate limiter de login
+  > é um `Map` em memória, cluster o dividiria; `cwd: ./backend` para o dotenv achar o `.env`; política
+  > de restart casada com os 3 `process.exit(1)` de fail-fast — `min_uptime`/`max_restarts` evitam
+  > thrash no erro permanente, `exp_backoff_restart_delay` aguenta o DB subindo no boot; logs em
+  > `backend/logs/`, **sem bloco `env`/segredos** — ficam no `.env`). `.gitignore` ganhou `backend/logs/`.
+  > README seção **"Running as a Windows Service"** em duas partes.
+  > **Decisões:** (1) persistência via **pm2-windows-service** (daemon PM2 como serviço real do Windows,
+  > sobe no boot sem login); (2) `PM2_HOME` fixado em `C:\ProgramData\pm2` e o serviço **deve** rodar sob
+  > a mesma conta que rodou `pm2 save` (caveat destacado no README).
+  > - **Parte A (process management)** — `pm2 install` + `PM2_HOME` + `pm2 start`/`save` + `pm2-logrotate`.
+  >   Entrega sobrevivência a fechamento de terminal + auto-restart em crash. **Deployável agora.**
+  > - **Parte B (reboot persistence)** — `pm2-windows-service`. O servidor **auto-reinicia sozinho**
+  >   (hardware/agendado), mas o processo Node **não** volta sem isto. **Pendente.**
+  > **Verificação (Parte B):** pega o **próximo reboot natural** da máquina — sem iniciar nada à mão,
+  > `pm2 status` deve mostrar `carcheck-api` **online com uptime novo** + `/api/health` → `success:true`.
+  > Se vazio/errored → corrigir o mismatch de conta/`PM2_HOME`. Sem acesso ao servidor aqui — instalação
+  > e verificação são manuais.
 
 - ⬜ **B9 — Suíte de testes de integração**
   No mínimo, testes de rota da API cobrindo: `login`, submissão de `checklist`, abertura/encerramento
