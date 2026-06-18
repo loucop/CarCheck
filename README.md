@@ -134,99 +134,115 @@ For development with auto-restart:
 ## Running as a Windows Service
 
 In production the backend must survive terminal close, auto-restart on crash,
-**and** come back up after the server reboots. This is handled by **PM2** in two
-stages — Part A gets the process managed and crash-resilient immediately; Part B
-closes the reboot gap. The process definition lives in `ecosystem.config.js` at
-the repo root (fork mode, `cwd: ./backend`, restart policy, logs under
-`backend/logs/` — no secrets; they stay in `backend/.env`).
+**and** come back up after the server reboots. This is handled by **NSSM** (the
+Non-Sucking Service Manager) in two stages — Part A gets the process managed and
+crash-resilient immediately; Part B confirms it survives a reboot.
 
-> ⚠️ **Read this first — the two caveats that break PM2 on Windows:**
->
-> 1. **Pin `PM2_HOME`.** Set it to a fixed path (`C:\ProgramData\pm2`) for
->    **every** PM2 command below. PM2 stores its saved process list and logs
->    under `PM2_HOME`; if the value drifts between commands, the service won't
->    find the apps you saved.
-> 2. **Same account for `pm2 save` and the service.** The `pm2 save` snapshot is
->    resurrected on boot by the Windows Service. The service **must run under the
->    same account that ran `pm2 save`** (and that account needs `node` + `pm2` on
->    its `PATH`). If they differ, the service starts an empty PM2 with nothing to
->    resurrect. Run everything below as that account (e.g. Administrator).
+> **Why NSSM and not PM2?** PM2 is an npm package and inherits Node's platform
+> check, which **refuses to run on this server's Windows Server 2012** (EOL,
+> below the Node/npm tooling baseline — see BACKLOG **I1**). NSSM is a single
+> native `nssm.exe` binary with no Node version requirement, and provides
+> crash-restart + start-at-boot itself.
+
+> ⚠️ **The one load-bearing setting: `AppDirectory`.** The service must run
+> `node index.js` with its **working directory = the backend folder**. Both
+> `index.js` and `config/database.js` call `dotenv.config()` with no path, so
+> dotenv reads `.env` from the process CWD. If `AppDirectory` is wrong, `.env`
+> doesn't load → `JWT_SECRET` missing → the process exits immediately. This is
+> the exact analogue of the old PM2 `cwd: ./backend`.
+
+Install NSSM by dropping `nssm.exe` somewhere on PATH (e.g. `C:\nssm\nssm.exe`).
+The backend deploy path on this server is `C:\xampp\htdocs\CarCheck\backend`.
 
 ### Part A — Process management
 
-Gets you terminal-close survival + crash auto-restart right away.
+Gets you terminal-close survival + crash auto-restart right away. Run everything
+as Administrator.
 
-**1. Install PM2 (run as Administrator):**
+**1. Find node.exe and pre-create the log dir** (NSSM does **not** create it):
 
-    npm install -g pm2
+    where node                         REM e.g. C:\Program Files\nodejs\node.exe
+    mkdir C:\xampp\htdocs\CarCheck\backend\logs
 
-**2. Pin PM2_HOME (machine-wide, then for this session):**
+**2. Install the service** (working dir + identity):
 
-    setx PM2_HOME "C:\ProgramData\pm2" /M
-    set PM2_HOME=C:\ProgramData\pm2
+    nssm install CarCheckAPI "C:\Program Files\nodejs\node.exe" index.js
+    nssm set CarCheckAPI AppDirectory C:\xampp\htdocs\CarCheck\backend
+    nssm set CarCheckAPI DisplayName  "CarCheck API"
+    nssm set CarCheckAPI Description   "CarCheck backend (Node/Express) - fleet inspection API"
 
-`setx ... /M` writes the machine-wide variable so the service (Part B) sees it on
-boot; `set` applies it to the current shell so the commands below use the same home.
+Using the **full path to `node.exe`** avoids PATH issues under the service
+account (default `LocalSystem`, which can read the deploy folder; DB auth is via
+TCP credentials in `.env`, so no named account is needed).
 
-**3. Start the app and save the process list:**
+**3. stdout/stderr -> backend\logs (with rotation):**
 
-    cd C:\path\to\CarCheck
-    pm2 start ecosystem.config.js
-    pm2 status                       # confirm carcheck-api is "online"
-    pm2 save                         # snapshot for resurrect-on-boot (used by Part B)
+    nssm set CarCheckAPI AppStdout      C:\xampp\htdocs\CarCheck\backend\logs\carcheck-out.log
+    nssm set CarCheckAPI AppStderr      C:\xampp\htdocs\CarCheck\backend\logs\carcheck-error.log
+    nssm set CarCheckAPI AppRotateFiles 1
+    nssm set CarCheckAPI AppRotateOnline 1
+    nssm set CarCheckAPI AppRotateBytes 10485760   REM 10 MB
 
-**4. Log rotation (PM2 is chatty — cap disk usage):**
+**4. Auto-restart + anti-thrash:**
 
-    pm2 install pm2-logrotate
-    pm2 set pm2-logrotate:max_size 10M
-    pm2 set pm2-logrotate:retain 14
+    REM crash (exit !=0) -> restart;  graceful exit 0 (SIGINT/SIGTERM) -> stay stopped
+    nssm set CarCheckAPI AppExit Default Restart
+    nssm set CarCheckAPI AppExit 0 Exit
+    REM treat a run shorter than 10s as a failed start and back off (prevents a
+    REM thrash loop on a permanent failure like a missing .env -> exit in <1s)
+    nssm set CarCheckAPI AppThrottle     10000     REM ms; min "successful" uptime
+    nssm set CarCheckAPI AppRestartDelay 2000      REM ms delay before each restart
 
-Live tail when troubleshooting:
+`AppThrottle` is the key anti-thrash lever: a process that dies inside 10s is
+retried at most ~every 10s instead of hammering, while a genuinely transient
+cause still recovers (NSSM throttles rather than giving up).
 
-    pm2 logs carcheck-api
+**5. Start and verify:**
+
+    nssm start CarCheckAPI
+    nssm status CarCheckAPI            REM expect SERVICE_RUNNING
+    curl http://localhost:3000/api/health
+
+Health must return `{"success":true,...,"status":"online"}`. Confirm
+`backend\logs\carcheck-out.log` shows the startup banner and
+`[DB] Conexão estabelecida`.
 
 At this point the backend survives terminal close and auto-restarts on crash.
-It does **not** yet survive a reboot — continue to Part B.
+Reboot survival is confirmed in Part B.
 
 ### Part B — Reboot persistence
 
-This server **auto-reboots on its own** (hardware/scheduled), but the Node
-process does **not** come back by itself after one — PM2's own startup hook is
-not supported on Windows. **pm2-windows-service** closes that gap by running the
-PM2 daemon as a true Windows Service that starts at boot (no login required) and
-resurrects the `pm2 save` snapshot from Part A. Without Part B, the app stays
-down after every reboot.
+NSSM registers the service as **Automatic** start, so it comes up at boot with no
+login. Set delayed-auto-start so XAMPP/MariaDB is up first (the app exits if the
+DB is unreachable at boot):
 
-**1. Install the service wrapper (run as Administrator):**
+    nssm set CarCheckAPI Start SERVICE_DELAYED_AUTO_START
 
-    npm install -g pm2-windows-service
+Optional hardening: if XAMPP's MariaDB runs as a service (e.g. `mysql`), make the
+API wait for it explicitly:
 
-**2. Install the PM2 Windows Service:**
+    nssm set CarCheckAPI DependOnService mysql
 
-    pm2-service-install -n PM2
-
-Accept the prompts. This registers the PM2 daemon as a service that resurrects
-the saved process list at boot. Ensure the service runs under the **same
-account** that ran `pm2 save` in Part A (see caveat above).
+This server **auto-reboots on its own** (hardware/scheduled), and the current
+hand-started `node` process does **not** survive that — which is the gap this
+service closes. Without Part B, the app stays down after every reboot.
 
 ### Verification — rides the next natural reboot
 
-No need to force a reboot: this server reboots on its own, so verification piggy-backs
-on the **next natural reboot**. After it happens, **without starting anything manually**,
-open a shell (with `PM2_HOME=C:\ProgramData\pm2`) and run:
+No need to force a reboot: this server reboots on its own, so verification
+piggy-backs on the **next natural reboot**. After it happens, **without starting
+anything manually**, run:
 
-    pm2 status
-
-Confirm **`carcheck-api` shows `online`** with a **fresh uptime** — i.e. the
-service auto-started it after the reboot, not you. Also hit the health endpoint:
-
+    Get-Service CarCheckAPI           REM Status = Running
     curl http://localhost:3000/api/health
 
-It must return `{"success":true,...,"status":"online"}`.
+Confirm the service is **Running** (started by the SCM at boot, not by hand — the
+log timestamp in `carcheck-out.log` should line up with boot time) and health
+returns `{"success":true,...,"status":"online"}`.
 
-If `pm2 status` is empty or the app is `stopped`/`errored` after a reboot, the
-**same-account / `PM2_HOME`** caveat was not satisfied — re-run Part A step 2–3
-and Part B as the account the service runs under.
+If the service is `Stopped`/`Paused` after a reboot, check `carcheck-error.log`
+for the cause (commonly the DB not being ready in time — the `AppThrottle` back-off
+and `DependOnService mysql` above address this).
 
 ---
 

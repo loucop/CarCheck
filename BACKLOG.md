@@ -679,27 +679,34 @@
   HTML estático + 46 gerados em `admin.js`) e os ~652 linhas de blocos `<style>` para classes
   em `style.css`. Maior esforço; ganho cosmético/defesa-em-profundidade, não fecha exploit ativo.
 
-- 🟢 **B8 — Gerenciamento de processo (PM2 + serviço do Windows)** *(implementado 2026-06-18; Parte A deployável já, Parte B pendente de verificação)*
-  Hoje o backend morre quando o terminal é fechado e não reinicia sozinho após crash. Configurar
-  **PM2** (ou um serviço do Windows) para manter o processo vivo, reiniciar em falha e subir no boot.
-  Correção rápida (~30 min). **Obrigatório antes do deploy público.**
-  > **✅ Implementado (2026-06-18):** `ecosystem.config.js` na raiz (fork mode — o rate limiter de login
-  > é um `Map` em memória, cluster o dividiria; `cwd: ./backend` para o dotenv achar o `.env`; política
-  > de restart casada com os 3 `process.exit(1)` de fail-fast — `min_uptime`/`max_restarts` evitam
-  > thrash no erro permanente, `exp_backoff_restart_delay` aguenta o DB subindo no boot; logs em
-  > `backend/logs/`, **sem bloco `env`/segredos** — ficam no `.env`). `.gitignore` ganhou `backend/logs/`.
-  > README seção **"Running as a Windows Service"** em duas partes.
-  > **Decisões:** (1) persistência via **pm2-windows-service** (daemon PM2 como serviço real do Windows,
-  > sobe no boot sem login); (2) `PM2_HOME` fixado em `C:\ProgramData\pm2` e o serviço **deve** rodar sob
-  > a mesma conta que rodou `pm2 save` (caveat destacado no README).
-  > - **Parte A (process management)** — `pm2 install` + `PM2_HOME` + `pm2 start`/`save` + `pm2-logrotate`.
-  >   Entrega sobrevivência a fechamento de terminal + auto-restart em crash. **Deployável agora.**
-  > - **Parte B (reboot persistence)** — `pm2-windows-service`. O servidor **auto-reinicia sozinho**
-  >   (hardware/agendado), mas o processo Node **não** volta sem isto. **Pendente.**
+- 🟢 **B8 — Gerenciamento de processo (NSSM como serviço do Windows)** *(implementado 2026-06-18; Parte A deployável já, Parte B pendente de verificação)*
+  Hoje o backend morre quando o terminal é fechado e não reinicia sozinho após crash. Configurar um
+  serviço do Windows para manter o processo vivo, reiniciar em falha e subir no boot.
+  Correção rápida. **Obrigatório antes do deploy público.**
+  > **⚠️ Pivot PM2 → NSSM (2026-06-18):** a tentativa inicial com **PM2** falhou — o PM2 é pacote npm e
+  > herda o check de plataforma do Node, que **recusa rodar no Windows Server 2012** do servidor (`pm2`
+  > não reconhecido após o install). Trocado por **NSSM** (`nssm.exe`, binário nativo único, sem
+  > requisito de versão de Node). `ecosystem.config.js` **removido** (preservado no histórico do git;
+  > re-adicionar só se/quando o SO for atualizado — PM2 é a melhor ferramenta quando a plataforma
+  > suportar). A causa-raiz (2012 fora de suporte, abaixo da baseline de tooling) virou o item **I1**.
+  > **✅ Implementado (2026-06-18):** seção README **"Running as a Windows Service"** reescrita para NSSM,
+  > mantendo o framing Parte A / Parte B. `.gitignore` mantém `backend/logs/`.
+  > **Setting load-bearing:** `AppDirectory = C:\xampp\htdocs\CarCheck\backend` (análogo exato do antigo
+  > `cwd: ./backend` do PM2 — o dotenv lê `.env` do CWD; errado → `JWT_SECRET` ausente → exit).
+  > **Anti-thrash:** `AppExit Default Restart` + `AppExit 0 Exit` (crash reinicia; saída graciosa 0 fica
+  > parada) + `AppThrottle 10000` (run < 10s = falha de start, com back-off) — evita loop de thrash num
+  > erro permanente (ex.: `.env` faltando). Logs via `AppStdout`/`AppStderr` → `backend/logs/` com
+  > rotação (`AppRotate*`, 10 MB). Instância única (combina com o rate limiter de login em memória).
+  > - **Parte A (process management)** — `nssm install` + `AppDirectory` + logs + auto-restart/anti-thrash
+  >   + `nssm start`. Entrega sobrevivência a fechamento de terminal + auto-restart em crash. **Deployável agora.**
+  > - **Parte B (reboot persistence)** — `Start SERVICE_DELAYED_AUTO_START` (sobe no boot, sem login;
+  >   atrasado p/ o MariaDB do XAMPP subir antes; opcional `DependOnService mysql`). O servidor
+  >   **auto-reinicia sozinho** (hardware/agendado), mas o processo Node **não** volta sem isto. **Pendente.**
   > **Verificação (Parte B):** pega o **próximo reboot natural** da máquina — sem iniciar nada à mão,
-  > `pm2 status` deve mostrar `carcheck-api` **online com uptime novo** + `/api/health` → `success:true`.
-  > Se vazio/errored → corrigir o mismatch de conta/`PM2_HOME`. Sem acesso ao servidor aqui — instalação
-  > e verificação são manuais.
+  > `Get-Service CarCheckAPI` deve mostrar **Running** (start pelo SCM no boot, não manual — timestamp do
+  > log bate com o boot) + `/api/health` → `success:true`. Se `Stopped` → checar `carcheck-error.log`
+  > (em geral o DB não pronto a tempo; `AppThrottle` + `DependOnService mysql` endereçam). Sem acesso ao
+  > servidor aqui — instalação e verificação são manuais.
 
 - ⬜ **B9 — Suíte de testes de integração**
   No mínimo, testes de rota da API cobrindo: `login`, submissão de `checklist`, abertura/encerramento
@@ -725,6 +732,18 @@
   **ignora o campo `json.code`** — não há roteamento automático (ex.: redirecionar para
   `checklist.html` em `CHECKLIST_REQUIRED`, ou trocar o veículo em `VEHICLE_MISMATCH`). O motorista
   é informado do que fazer, mas precisa navegar manualmente. **Nice-to-have de UX, não correção.**
+
+- 🔴 **I1 — Windows Server 2012 fora de suporte / abaixo da baseline de tooling (risco de infraestrutura)**
+  O servidor de produção roda **Windows Server 2012**, cujo suporte estendido terminou em
+  **2023-10-10** — sem patches de segurança desde então. Além do risco de OS sem correção, a versão
+  já **bloqueia tooling ativamente**: o PM2 (B8) recusou instalar pelo check de plataforma do Node
+  (`pm2` não reconhecido após o install), forçando o pivot para NSSM. Cada dependência nova que
+  assuma um Windows/Node moderno tende a esbarrar nisto.
+  - **Risco:** superfície de ataque sem patch + ferramentas modernas indisponíveis. **Bloqueante para
+    deploy público** (M6) — um host público sem patches de SO é inaceitável.
+  - **Ação:** migrar para um Windows Server suportado (2019/2022) ou Linux. Reavaliar PM2 pós-migração
+    (re-adicionar `ecosystem.config.js`, removido em B8, a partir do histórico do git).
+  - Relaciona-se a **B8** (NSSM como contorno) e ao planejamento de deploy público (**M6**).
 
 ---
 
