@@ -681,10 +681,17 @@
   HTML estático + 46 gerados em `admin.js`) e os ~652 linhas de blocos `<style>` para classes
   em `style.css`. Maior esforço; ganho cosmético/defesa-em-profundidade, não fecha exploit ativo.
 
-- 🟢 **B8 — Gerenciamento de processo (NSSM como serviço do Windows)** *(implementado 2026-06-18; Parte A deployável já, Parte B pendente de verificação)*
+- 🟡 **B8 — Gerenciamento de processo (NSSM como serviço do Windows)** *(config + docs completos e commitados 2026-06-18; instalação do serviço BLOQUEADA por falta de acesso de administrador)*
   Hoje o backend morre quando o terminal é fechado e não reinicia sozinho após crash. Configurar um
   serviço do Windows para manter o processo vivo, reiniciar em falha e subir no boot.
   Correção rápida. **Obrigatório antes do deploy público.**
+  > **⛔ BLOQUEADO na instalação (2026-06-19):** a config NSSM e a doc do README estão **completas e
+  > commitadas**, mas o serviço **não pode ser registrado** com a conta atual do servidor (`geral`),
+  > que é um **usuário padrão sem direitos de Administrador** — registrar um serviço do Windows exige
+  > admin. A instalação precisa ser feita pelo **administrador do servidor (gestor)** seguindo os
+  > comandos NSSM da seção **"Running as a Windows Service"** do README. **Até lá, o CarCheck roda como
+  > um processo `node` iniciado à mão — sem auto-restart e sem sobreviver a reboot.** Tudo do
+  > B8 (Parte A *e* Parte B) fica pendente desse passo de admin.
   > **⚠️ Pivot PM2 → NSSM (2026-06-18):** a tentativa inicial com **PM2** falhou — o PM2 é pacote npm e
   > herda o check de plataforma do Node, que **recusa rodar no Windows Server 2012** do servidor (`pm2`
   > não reconhecido após o install). Trocado por **NSSM** (`nssm.exe`, binário nativo único, sem
@@ -700,7 +707,8 @@
   > erro permanente (ex.: `.env` faltando). Logs via `AppStdout`/`AppStderr` → `backend/logs/` com
   > rotação (`AppRotate*`, 10 MB). Instância única (combina com o rate limiter de login em memória).
   > - **Parte A (process management)** — `nssm install` + `AppDirectory` + logs + auto-restart/anti-thrash
-  >   + `nssm start`. Entrega sobrevivência a fechamento de terminal + auto-restart em crash. **Deployável agora.**
+  >   + `nssm start`. Entrega sobrevivência a fechamento de terminal + auto-restart em crash.
+  >   **Requer admin para `nssm install` — bloqueado (ver acima).**
   > - **Parte B (reboot persistence)** — `Start SERVICE_DELAYED_AUTO_START` (sobe no boot, sem login;
   >   atrasado p/ o MariaDB do XAMPP subir antes; opcional `DependOnService mysql`). O servidor
   >   **auto-reinicia sozinho** (hardware/agendado), mas o processo Node **não** volta sem isto. **Pendente.**
