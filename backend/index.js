@@ -109,10 +109,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ==========================================
 // RATE LIMITING - LOGIN (in-memory, no dependencies)
 // Máx. 5 tentativas por IP a cada 15 minutos
+// Store em memória: aceito para o deploy single-process atual (reseta no restart,
+// não compartilha estado entre instâncias). Revisar se o deploy virar multi-instância
+// (pós-M6 ou pós-migração Linux) — considerar Redis ou sticky sessions.
 // ==========================================
 
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutos
+const LOGIN_WINDOW_MIN = LOGIN_WINDOW_MS / 60000;
 const loginAttempts = new Map(); // key: IP, value: { count, resetAt }
 
 function loginRateLimiter(req, res, next) {
@@ -132,7 +136,7 @@ function loginRateLimiter(req, res, next) {
     if (entry && entry.resetAt > now && entry.count >= LOGIN_MAX_ATTEMPTS) {
         return res.status(429).json({
             success: false,
-            error: 'Muitas tentativas de login. Tente novamente em 15 minutos.',
+            error: `Muitas tentativas de login. Tente novamente em ${LOGIN_WINDOW_MIN} minutos.`,
             code: 'RATE_LIMIT_EXCEEDED'
         });
     }
