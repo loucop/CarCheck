@@ -23,7 +23,7 @@
  * - Envolve todo o loop de UPDATE numa transação: falha no meio → rollback total.
  */
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const pool = require('../src/config/database');
 
 // Prefixos de bcrypt válidos: 2a, 2b, 2y (todos bcrypt). Texto plano não casa.

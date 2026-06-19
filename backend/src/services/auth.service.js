@@ -1,4 +1,4 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const funcionarioRepository = require('../repositories/funcionario.repository');
 const { ERROR_CODES } = require('../utils/constants');
@@ -19,8 +19,8 @@ const authService = {
             };
         }
 
-        // Verifica se senha está hasheada (bcrypt começa com $2b$)
-        const isHashed = funcionario.senha.startsWith('$2b$');
+        // Verifica se senha está hasheada (bcrypt: $2a$ / $2b$ / $2y$)
+        const isHashed = /^\$2[aby]\$/.test(funcionario.senha);
         
         let senhaValida;
         if (isHashed) {
