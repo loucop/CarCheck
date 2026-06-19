@@ -659,9 +659,11 @@
   Projeto não possui testes (decisão atual). Caso evolua, priorizar testes dos serviços
   transacionais (`checklist.service`, `bdv.service` — locks `FOR UPDATE`, validação de KM).
 
-- ⬜ **B6 — Housekeeping do repositório**
+- ✅ **B6 — Housekeeping do repositório** *(resolvido 2026-06-19)*
   Remover arquivos vazios soltos no working dir (`git`, `main`) e decidir sobre `LICENSE`
   (untracked). Adicionar ao `.gitignore` se necessário.
+  > **✅ Resolvido (2026-06-19):** os arquivos vazios `git`/`main` não existem mais no working dir;
+  > `LICENSE` foi **commitado/rastreado** (entrou junto no `d47f48e` via `git add -A`). Nada a ignorar.
 
 - ⬜ **B7 — Auditar XSS nas telas do motorista**
   A auditoria de A1 cobriu apenas as páginas admin. Revisar os sinks de `innerHTML` em
