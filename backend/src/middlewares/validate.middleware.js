@@ -202,6 +202,13 @@ const schemas = {
         })
         .refine(motivoSeOverride, { message: 'Motivo é obrigatório quando km_override está ativo', path: ['motivo'] }),
 
+    // A7 slice 2: âncora de KM do veículo (§6.2). Ambos obrigatórios — km_override é sempre
+    // true neste endpoint, portanto motivo é sempre exigido (§6.3). Reusa correcaoParams (:id).
+    correcaoKmVeiculo: z.object({
+        km_novo: z.coerce.number().nonnegative('KM não pode ser negativo'),
+        motivo: z.string().min(1, 'Motivo é obrigatório').max(500)
+    }).strict(),
+
     // A4-L1: schema de QUERY — não-strict de propósito (parâmetros avulsos na query string).
     relatorioBDV: z.object({
         matricula: z.string().max(20).optional(),

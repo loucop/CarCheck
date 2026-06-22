@@ -234,6 +234,19 @@ router.patch(
     correcaoController.corrigirParada
 );
 
+/**
+ * PATCH /api/correcoes/veiculo/:id/km
+ * Seta a âncora de KM do veículo (§6.2) — km_override sempre true, motivo obrigatório.
+ */
+router.patch(
+    '/correcoes/veiculo/:id/km',
+    authenticate,
+    authorize(ROLES.VISTORIADOR, ROLES.ADMIN),
+    validate(schemas.correcaoParams, 'params'),
+    validate(schemas.correcaoKmVeiculo),
+    correcaoController.corrigirKmVeiculo
+);
+
 // ==========================================
 // ROTAS ADMINISTRATIVAS (Apenas Admin)
 // ==========================================

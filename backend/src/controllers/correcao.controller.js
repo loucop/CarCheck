@@ -54,6 +54,31 @@ const correcaoController = {
     },
 
     /**
+     * PATCH /api/correcoes/veiculo/:id/km
+     */
+    async corrigirKmVeiculo(req, res, next) {
+        let conn;
+        try {
+            conn = await pool.getConnection();
+
+            const result = await correcaoService.corrigirKmVeiculo(
+                conn,
+                parseInt(req.params.id),
+                req.body.km_novo,
+                req.body.motivo,
+                req.user
+            );
+
+            return response.success(res, result, 'Correção registrada com sucesso');
+
+        } catch (err) {
+            return next(err);
+        } finally {
+            if (conn) conn.release();
+        }
+    },
+
+    /**
      * PATCH /api/correcoes/bdv/:id/paradas/:paradaId
      */
     async corrigirParada(req, res, next) {

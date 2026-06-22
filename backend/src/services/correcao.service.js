@@ -176,6 +176,67 @@ const correcaoService = {
         }
     },
 
+    async corrigirKmVeiculo(conn, id, km_novo, motivo, user) {
+        // Fail-fast 404 outside transaction (same pattern as the other three methods).
+        const row = await correcaoRepository.findVeiculoById(conn, id);
+        if (!row) {
+            throw {
+                message: 'Veículo não encontrado',
+                code: ERROR_CODES.RESOURCE_NOT_FOUND,
+                statusCode: 404
+            };
+        }
+
+        // km_override is always true here — motivo is therefore always required.
+        // The Zod schema already enforces this; the service re-validates as a second barrier.
+        if (!motivo || motivo.trim().length === 0) {
+            throw {
+                message: 'Motivo é obrigatório para correção de KM do veículo',
+                code: ERROR_CODES.VALIDATION_ERROR,
+                statusCode: 400
+            };
+        }
+
+        try {
+            await conn.beginTransaction();
+
+            // Lock the vehicle row before writing (same discipline as the driver path).
+            await veiculoRepository.findByIdWithLock(conn, id);
+
+            await correcaoRepository.updateKmVeiculo(conn, id, km_novo);
+
+            const correcaoId = await correcaoRepository.insertCorrecao(conn, {
+                vistoriador_matricula: user.matricula,
+                entidade: 'veiculo',
+                entidade_id: id,
+                motivo,
+                km_override: 1,
+                coligada: user.coligada ?? null
+            });
+
+            await correcaoRepository.insertCorrecaoCampo(
+                conn,
+                correcaoId,
+                'km_atual',
+                String(row.km_atual),
+                String(km_novo)
+            );
+
+            await conn.commit();
+
+            return {
+                correcao_id: String(correcaoId),
+                entidade: 'veiculo',
+                entidade_id: String(id),
+                campos_alterados: ['km_atual'],
+                km_override: true
+            };
+        } catch (err) {
+            await conn.rollback();
+            throw err;
+        }
+    },
+
     async corrigirParada(conn, bdv_id, parada_id, payload, user) {
         const { motivo, km_override, ...campos } = payload;
 

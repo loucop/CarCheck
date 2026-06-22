@@ -38,6 +38,14 @@ const correcaoRepository = {
         return rows[0] || null;
     },
 
+    async findVeiculoById(conn, id) {
+        const rows = await conn.query(
+            'SELECT id, km_atual FROM veiculos WHERE id = ? LIMIT 1',
+            [id]
+        );
+        return rows[0] || null;
+    },
+
     // Junta o BDV para trazer veiculo_id (lock de KM) e coligada (header de auditoria).
     async findParadaById(conn, bdv_id, parada_id) {
         const query = `
@@ -82,6 +90,14 @@ const correcaoRepository = {
         const result = await conn.query(
             `UPDATE bdv_paradas SET ${clause} WHERE id = ? AND bdv_id = ?`,
             [...params, parada_id, bdv_id]
+        );
+        return result.affectedRows;
+    },
+
+    async updateKmVeiculo(conn, id, km_atual) {
+        const result = await conn.query(
+            'UPDATE veiculos SET km_atual = ? WHERE id = ?',
+            [km_atual, id]
         );
         return result.affectedRows;
     },
