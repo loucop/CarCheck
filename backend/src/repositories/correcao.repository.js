@@ -129,6 +129,67 @@ const correcaoRepository = {
         `;
         const result = await conn.query(query, [correcao_id, campo, valor_antigo, valor_novo]);
         return result.insertId;
+    },
+
+    // ----- Leitura do histórico de correções -----
+
+    async findCorrecoes(conn, { entidade, entidade_id, matricula, limit = 20, offset = 0 }) {
+        const where = [];
+        const params = [];
+
+        if (entidade !== undefined) {
+            where.push('entidade = ?');
+            params.push(entidade);
+        }
+        if (entidade_id !== undefined) {
+            where.push('entidade_id = ?');
+            params.push(entidade_id);
+        }
+        if (matricula !== undefined) {
+            where.push('vistoriador_matricula = ?');
+            params.push(matricula);
+        }
+
+        const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+        // Paginate by correction header via derived table — keeps LIMIT/OFFSET on
+        // the correcoes rows, not on the flat JOIN (which would split a correction's campos).
+        const query = `
+            SELECT c.id, c.vistoriador_matricula, c.entidade, c.entidade_id,
+                   c.motivo, c.km_override, c.coligada, c.criado_em,
+                   cc.campo, cc.valor_antigo, cc.valor_novo
+            FROM (
+                SELECT id FROM correcoes
+                ${whereClause}
+                ORDER BY criado_em DESC, id DESC
+                LIMIT ? OFFSET ?
+            ) paged
+            JOIN correcoes c ON c.id = paged.id
+            LEFT JOIN correcoes_campos cc ON cc.correcao_id = c.id
+            ORDER BY c.criado_em DESC, c.id DESC
+        `;
+        params.push(Number(limit), Number(offset));
+
+        const rows = await conn.query(query, params);
+
+        // Group campos by correction header in JS (no GROUP BY / GROUP_CONCAT in SQL).
+        const map = new Map();
+        for (const row of rows) {
+            const { campo, valor_antigo, valor_novo, ...header } = row;
+            if (!map.has(header.id)) {
+                map.set(header.id, {
+                    ...header,
+                    id: String(header.id),
+                    entidade_id: String(header.entidade_id),
+                    campos: []
+                });
+            }
+            if (campo !== null) {
+                map.get(header.id).campos.push({ campo, valor_antigo, valor_novo });
+            }
+        }
+
+        return Array.from(map.values());
     }
 };
 

@@ -209,6 +209,16 @@ const schemas = {
         motivo: z.string().min(1, 'Motivo é obrigatório').max(500)
     }).strict(),
 
+    // A7 slice 3: histórico de correções — query params, NOT .strict() (query strings
+    // can carry extra params; all filters are optional).
+    correcaoQuery: z.object({
+        entidade: z.enum(['checklist', 'bdv', 'bdv_parada', 'veiculo']).optional(),
+        entidade_id: z.coerce.number().int().positive().optional(),
+        matricula: z.string().max(20).optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+        offset: z.coerce.number().int().nonnegative().default(0)
+    }),
+
     // A4-L1: schema de QUERY — não-strict de propósito (parâmetros avulsos na query string).
     relatorioBDV: z.object({
         matricula: z.string().max(20).optional(),

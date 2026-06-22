@@ -6,6 +6,25 @@ const response = require('../utils/response');
 // vem SEMPRE do JWT (req.user), nunca do corpo (mesmo padrão do A3).
 const correcaoController = {
     /**
+     * GET /api/correcoes
+     */
+    async getHistorico(req, res, next) {
+        let conn;
+        try {
+            conn = await pool.getConnection();
+
+            const result = await correcaoService.getHistorico(conn, req.query);
+
+            return response.success(res, result);
+
+        } catch (err) {
+            return next(err);
+        } finally {
+            if (conn) conn.release();
+        }
+    },
+
+    /**
      * PATCH /api/correcoes/checklist/:id
      */
     async corrigirChecklist(req, res, next) {

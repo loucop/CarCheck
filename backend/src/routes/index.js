@@ -247,18 +247,31 @@ router.patch(
     correcaoController.corrigirKmVeiculo
 );
 
+/**
+ * GET /api/correcoes
+ * Histórico de correções, filtrável por entidade/entidade_id/matricula. (A7 slice 3)
+ * Vistoriador vê todas as correções (papel de supervisor); admin idem.
+ */
+router.get(
+    '/correcoes',
+    authenticate,
+    authorize(ROLES.VISTORIADOR, ROLES.ADMIN),
+    validate(schemas.correcaoQuery, 'query'),
+    correcaoController.getHistorico
+);
+
 // ==========================================
 // ROTAS ADMINISTRATIVAS (Apenas Admin)
 // ==========================================
 
 /**
  * GET /api/admin/relatorio
- * Relatório de inspeções (com filtros)
+ * Relatório de inspeções (com filtros). A7: vistoriador precisa ver para poder corrigir.
  */
 router.get(
     '/admin/relatorio',
     authenticate,
-    authorize(ROLES.ADMIN),
+    authorize(ROLES.VISTORIADOR, ROLES.ADMIN),
     validate(schemas.relatorioAdmin, 'query'),
     adminController.getRelatorio
 );
@@ -288,12 +301,12 @@ router.post(
 
 /**
  * GET /api/admin/bdv
- * Relatório de BDVs com filtros
+ * Relatório de BDVs com filtros. A7: vistoriador precisa ver para poder corrigir.
  */
 router.get(
     '/admin/bdv',
     authenticate,
-    authorize(ROLES.ADMIN),
+    authorize(ROLES.VISTORIADOR, ROLES.ADMIN),
     validate(schemas.relatorioBDV, 'query'),
     bdvController.relatorio
 );

@@ -237,6 +237,10 @@ const correcaoService = {
         }
     },
 
+    async getHistorico(conn, query) {
+        return correcaoRepository.findCorrecoes(conn, query);
+    },
+
     async corrigirParada(conn, bdv_id, parada_id, payload, user) {
         const { motivo, km_override, ...campos } = payload;
 
