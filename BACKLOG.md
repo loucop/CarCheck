@@ -230,7 +230,7 @@
     checklist→BDV **role-aware**, de modo que checklists de vistoriador não disparem o soft-lock nem
     exijam um BDV.
 
-- 🟢 **A7 — Capacidades de correção/override do vistoriador (papel de supervisor)** *(desenhado 2026-06-18; pronto para implementar)*
+- 🔵 **A7 — Capacidades de correção/override do vistoriador (papel de supervisor)** *(backend completo e verificado em prod 2026-06-22; slice 4 (UI) pendente clarificação de fluxo operacional)*
   O papel **vistoriador** deve poder: **(1)** definir/corrigir qualquer valor de **KM**, inclusive
   **sobrepondo a validação de monotonicidade do KM** (caso um motorista tenha digitado errado); e
   **(2)** sinalizar e corrigir uma gama de erros em **checklists/BDVs**. É um papel de **override de
@@ -380,11 +380,18 @@
   - **Timeline de auditoria por registro** (lê `GET /api/correcoes`) — quem mudou o quê, quando e por quê.
 
   ### Fatiamento de entrega
-  1. **Tabelas de auditoria + `correcao.service` + endpoints PATCH** (checklist/bdv/parada) com gate
-     `authorize(VISTORIADOR, ADMIN)` e regra de auditoria-na-mesma-transação.
-  2. **Realinhamento de âncora** — `PATCH /correcoes/veiculo/:id/km` + helper de recompute (§6.2).
-  3. **Endpoint de histórico** — `GET /api/correcoes` + pré-requisito de leitura dos dashboards.
-  4. **UI** — afordância de correção, diff + `motivo`, timeline de auditoria.
+  1. ✅ **Tabelas de auditoria + `correcao.service` + endpoints PATCH** (checklist/bdv/parada) com gate
+     `authorize(VISTORIADOR, ADMIN)` e regra de auditoria-na-mesma-transação. *(deployado e verificado em prod)*
+  2. ✅ **Realinhamento de âncora** — `PATCH /correcoes/veiculo/:id/km` + helper de recompute (§6.2). *(deployado e verificado em prod)*
+  3. ✅ **Endpoint de histórico** — `GET /api/correcoes` + pré-requisito de leitura dos dashboards
+     (`GET /api/admin/relatorio` e `GET /api/admin/bdv` relaxados para `authorize(VISTORIADOR, ADMIN)`). *(deployado e verificado em prod)*
+  4. ⬜ **UI** — afordância de correção, diff + `motivo`, timeline de auditoria.
+     > ⏸ **Deferido — pendente clarificação de fluxo operacional com o setor de logística.**
+     > Questões em aberto antes de desenhar a UI: (a) o vistoriador reutiliza o `checklist.html`
+     > existente ou precisa de um formulário de inspeção pós-retorno separado?
+     > (b) qual é o fluxo diário completo do vistoriador, do início ao fim?
+     > O backend (slices 1–3) é totalmente funcional — o vistoriador já pode executar todas as
+     > correções via API enquanto a UI aguarda definição.
 
   - Liga-se ao trabalho **role-aware** de checklist/BDV da nota de vistoriador do **A6**. Também se
     relaciona ao controle de acesso por objeto (A3) e ao planejamento multi-tenant (M6, escopo de
