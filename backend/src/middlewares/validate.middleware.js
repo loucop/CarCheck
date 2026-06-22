@@ -38,6 +38,13 @@ const IMAGE_DATA_URI_RE = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/;
 // suficiente para o que o frontend envia hoje (ex.: '2026-06-17T14:30', '2026-06-17').
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 
+// A7: refinements compartilhados pelos schemas de correção.
+// (a) pelo menos um campo corrigível presente; (b) motivo obrigatório quando
+// km_override=1 (§6.3). `motivo`/`km_override` são de controle, não contam como campo.
+const temAlgumCampo = (campos) => (data) => campos.some(c => data[c] !== undefined);
+const motivoSeOverride = (data) =>
+    !data.km_override || (typeof data.motivo === 'string' && data.motivo.trim().length > 0);
+
 const schemas = {
     login: z.object({
         matricula: z.string().min(1, 'Matrícula obrigatória').max(20),
@@ -132,6 +139,68 @@ const schemas = {
         id: z.coerce.number().int().positive('ID do BDV inválido'),
         paradaId: z.coerce.number().int().positive('ID da parada inválido')
     }).strict(),
+
+    // ==========================================
+    // A7 — Schemas de correção (vistoriador/admin)
+    // ==========================================
+
+    // Params de :id para /correcoes/checklist/:id e /correcoes/bdv/:id.
+    // (Paradas reusam `paradaParams` acima — { id, paradaId }.)
+    correcaoParams: z.object({
+        id: z.coerce.number().int().positive('ID inválido')
+    }).strict(),
+
+    // Corpo da correção de checklist. Todos os campos corrigíveis são opcionais
+    // (correção parcial); o refine exige ao menos um. Mesmos contratos de tipo do
+    // createChecklist (itens_status, mapa_avaria_base64), sem o guard de KM.
+    correcaoChecklist: z.object({
+        km_entrada: z.coerce.number().nonnegative('KM não pode ser negativo').optional(),
+        itens_status: z.union([
+            z.string().min(1).max(20000),
+            z.record(z.object({
+                status: z.string(),
+                obs: z.string().optional()
+            }))
+        ]).optional(),
+        local_origem: z.string().max(200).optional().nullable(),
+        local_destino: z.string().max(200).optional().nullable(),
+        mapa_avaria_base64: z.string().max(500000).regex(IMAGE_DATA_URI_RE, 'Formato de imagem inválido (esperado data:image/png|jpeg;base64,...)').optional(),
+        motivo: z.string().max(500).optional(),
+        km_override: z.boolean().default(false)
+    }).strict()
+        .refine(temAlgumCampo(['km_entrada', 'itens_status', 'local_origem', 'local_destino', 'mapa_avaria_base64']), {
+            message: 'Informe ao menos um campo para corrigir'
+        })
+        .refine(motivoSeOverride, { message: 'Motivo é obrigatório quando km_override está ativo', path: ['motivo'] }),
+
+    correcaoBDV: z.object({
+        km_inicial: z.coerce.number().nonnegative('KM não pode ser negativo').optional(),
+        km_final: z.coerce.number().nonnegative('KM final inválido').optional(),
+        combustivel_retorno: z.string().min(1).max(50).optional(),
+        coligada: z.enum(['angels', 'cemax']).optional(),
+        encerrado_fora_base: z.boolean().optional(),
+        motivo: z.string().max(500).optional(),
+        km_override: z.boolean().default(false)
+    }).strict()
+        .refine(temAlgumCampo(['km_inicial', 'km_final', 'combustivel_retorno', 'coligada', 'encerrado_fora_base']), {
+            message: 'Informe ao menos um campo para corrigir'
+        })
+        .refine(motivoSeOverride, { message: 'Motivo é obrigatório quando km_override está ativo', path: ['motivo'] }),
+
+    correcaoParada: z.object({
+        km: z.coerce.number().nonnegative().optional(),
+        hora_saida: z.string().max(32).regex(DATETIME_RE, 'Data/hora inválida').optional(),
+        hora_chegada: z.string().max(32).regex(DATETIME_RE, 'Data/hora inválida').optional(),
+        local_saida: z.string().min(1).max(200).optional(),
+        local_chegada: z.string().max(200).optional().nullable(),
+        observacao: z.string().max(1000).optional().nullable(),
+        motivo: z.string().max(500).optional(),
+        km_override: z.boolean().default(false)
+    }).strict()
+        .refine(temAlgumCampo(['km', 'hora_saida', 'hora_chegada', 'local_saida', 'local_chegada', 'observacao']), {
+            message: 'Informe ao menos um campo para corrigir'
+        })
+        .refine(motivoSeOverride, { message: 'Motivo é obrigatório quando km_override está ativo', path: ['motivo'] }),
 
     // A4-L1: schema de QUERY — não-strict de propósito (parâmetros avulsos na query string).
     relatorioBDV: z.object({

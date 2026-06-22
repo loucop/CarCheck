@@ -41,9 +41,10 @@ const authService = {
 
         // Gerar JWT
         const token = jwt.sign(
-            { 
-                matricula: funcionario.matricula, 
-                nivel_acesso: funcionario.nivel_acesso 
+            {
+                matricula: funcionario.matricula,
+                nivel_acesso: funcionario.nivel_acesso,
+                coligada: funcionario.coligada ?? null
             },
             process.env.JWT_SECRET,
             { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }

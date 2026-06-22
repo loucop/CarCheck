@@ -4,6 +4,7 @@ const veiculoController = require('../controllers/veiculo.controller');
 const checklistController = require('../controllers/checklist.controller');
 const adminController = require('../controllers/admin.controller');
 const bdvController = require('../controllers/bdv.controller');
+const correcaoController = require('../controllers/correcao.controller');
 
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { validate, schemas } = require('../middlewares/validate.middleware');
@@ -184,6 +185,53 @@ router.patch(
     validate(schemas.bdvParams, 'params'),
     validate(schemas.closeBDV),
     bdvController.close
+);
+
+// ==========================================
+// ROTAS DE CORREÇÃO (A7 — Vistoriador/Admin)
+// ==========================================
+// Caminho de escrita SEPARADO do fluxo do motorista (correcao.service): override de
+// nível supervisor, sem o guard de monotonicidade de KM. O gate de "quem pode quebrar
+// a monotonicidade" mora inteiramente aqui (authorize) + na existência do service.
+// CSRF já coberto (métodos de mutação, middleware montado globalmente).
+
+/**
+ * PATCH /api/correcoes/checklist/:id
+ * Corrige campos de um checklist (com auditoria)
+ */
+router.patch(
+    '/correcoes/checklist/:id',
+    authenticate,
+    authorize(ROLES.VISTORIADOR, ROLES.ADMIN),
+    validate(schemas.correcaoParams, 'params'),
+    validate(schemas.correcaoChecklist),
+    correcaoController.corrigirChecklist
+);
+
+/**
+ * PATCH /api/correcoes/bdv/:id
+ * Corrige campos de um BDV (com auditoria)
+ */
+router.patch(
+    '/correcoes/bdv/:id',
+    authenticate,
+    authorize(ROLES.VISTORIADOR, ROLES.ADMIN),
+    validate(schemas.correcaoParams, 'params'),
+    validate(schemas.correcaoBDV),
+    correcaoController.corrigirBDV
+);
+
+/**
+ * PATCH /api/correcoes/bdv/:id/paradas/:paradaId
+ * Corrige uma parada de um BDV (com auditoria)
+ */
+router.patch(
+    '/correcoes/bdv/:id/paradas/:paradaId',
+    authenticate,
+    authorize(ROLES.VISTORIADOR, ROLES.ADMIN),
+    validate(schemas.paradaParams, 'params'),
+    validate(schemas.correcaoParada),
+    correcaoController.corrigirParada
 );
 
 // ==========================================

@@ -24,7 +24,8 @@ const authenticate = (req, res, next) => {
         // Injeta dados do usuário na requisição
         req.user = {
             matricula: decoded.matricula,
-            nivel_acesso: decoded.nivel_acesso
+            nivel_acesso: decoded.nivel_acesso,
+            coligada: decoded.coligada ?? null
         };
         
         next();
