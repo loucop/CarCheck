@@ -820,10 +820,28 @@
   > **✅ Resolvido (2026-06-19):** os arquivos vazios `git`/`main` não existem mais no working dir;
   > `LICENSE` foi **commitado/rastreado** (entrou junto no `d47f48e` via `git add -A`). Nada a ignorar.
 
-- ⬜ **B7 — Auditar XSS nas telas do motorista**
-  A auditoria de A1 cobriu apenas as páginas admin. Revisar os sinks de `innerHTML` em
-  `frota.js`, `checklist.js` e `bdv.html` (lado motorista) e confirmar escape consistente.
-  Risco menor (dados em geral próprios do usuário), mas fecha a cobertura.
+- 🔵 **B7 — Auditar XSS nas telas do motorista** *(auditado 2026-06-24; 1 correção pendente)*
+  A auditoria de A1 cobriu apenas as páginas admin. Revisão dos sinks de `innerHTML` no lado motorista
+  (`frota.js`, `checklist.js`, `bdv.html`) concluída em 2026-06-24:
+  - ⬜ **`frota.js` (Médio — corrigir):** `carregarVeiculos` monta os cards com `innerHTML +=`
+    interpolando `v.modelo`/`v.placa`/`v.id` **sem escape**, tanto no texto HTML (`<h3>${v.modelo}</h3>`)
+    quanto **dentro de um atributo `onclick` com aspas simples**
+    (`onclick="iniciarChecklist('${v.id}', '${v.placa}', '${tipoVeiculo}', '${v.modelo}')"`). Um `'` ou
+    `<` no `modelo`/`placa` quebra a string JS do atributo → injeção de JS arbitrário (a aresta mais
+    afiada). Fonte hoje é admin/inserção manual no banco (risco menor), mas **escala para alto** na meta
+    multi-tenant/pública (M6/M9), onde dados de veículo podem ser preenchidos pelo cliente.
+    **Correção:** escapar via helper **e** trocar o `onclick` inline por `addEventListener` + `data-*`
+    (passa os valores por `dataset`, sem interpolar em string de atributo) — também remove um handler
+    inline (alinha com **M1-b**, rumo a CSP estrito).
+  - ⬜ **`bdv.html` (Baixo — defense-in-depth):** `renderizarParadas` escapa os campos de texto
+    (`escHtml` em `local_saida`/`local_chegada`/`observacao` ✓), mas `formatarData` **retorna a string
+    crua** quando a entrada não é data (`if (isNaN(d)) return str;`) e `${p.km}` é interpolado **cru**.
+    Difícil de alcançar (servidor valida `hora_*` por `DATETIME_RE` e `km` como número), mas escapar o
+    fallback de `formatarData` fecha o mesmo padrão já apontado no A1 (versão admin de `formatarData`).
+  - ✅ **`checklist.js` (limpo):** o único sink de `innerHTML` (`renderizarItens`) interpola o array
+    **constante** `itensChecklist` (hardcoded no arquivo), não dado de servidor/usuário. Sem vetor.
+  - Observação: `escHtml` (bdv.html) escapa `& < >` mas **não** aspas — adequado para contexto de texto
+    entre tags (onde é usado), insuficiente se algum dia for usado dentro de valor de atributo.
 
 - ⬜ **M1-b — Converter handlers inline `on*=` para `addEventListener`** *(sub-item de M1)*
   Para chegar a `script-src 'self'` sem `'unsafe-inline'`/`script-src-attr`, eliminar os ~19
