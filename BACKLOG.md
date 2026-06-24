@@ -780,6 +780,35 @@
   - **Correção:** equalizar o tempo com um `bcrypt.compare` dummy no caminho "não encontrado". Considerar
     lockout por conta no deploy público (pesando contra DoS-por-lockout).
 
+- ⬜ **M14 — Resiliência de conexão em rede móvel (timeout + feedback + guard de double-submit)** *(auditoria mobile 2026-06-24)*
+  O produto é usado por motoristas em campo, em celular, com cobertura instável — mas o cliente assume
+  rede confiável. Lacunas:
+  - **Sem timeout / `AbortController`:** todo `fetch`/`apiFetch` espera indefinidamente. Numa conexão
+    móvel que trava (túnel, elevador, zona morta) a request **pendura para sempre**, sem feedback — o
+    motorista não sabe se enviou. **Correção:** envolver as chamadas com `AbortController` + timeout
+    (ex.: 15–20 s) e mensagem de "rede lenta, tente de novo".
+  - **Sem guard de submissão em voo (double-submit):** `finalizarRelatorio` (checklist), `iniciarViagem`
+    (abrir BDV), `addParada`/`closeParada` **não desabilitam o botão** durante o POST. Numa rede lenta o
+    motorista toca de novo achando que não funcionou → **request duplicado**. Os guards de banco pegam
+    checklist/BDV duplicado (409, mas com `alert` confuso); **paradas NÃO têm guard** (linhas
+    duplicadas — liga ao TOCTOU do **M10**). **Correção:** desabilitar o botão no submit + reabilitar no
+    fim/erro (padrão idempotente de UX).
+  - Liga-se a **M8** (upload lento de 1 MB segura uma conexão do pool pela transferência inteira; payload
+    real é pequeno por causa do canvas 600×300, então risco baixo hoje).
+
+- ⬜ **M15 — Sem capacidade offline / fila de submissão (campo com cobertura instável)** *(auditoria mobile 2026-06-24)*
+  Não há service worker, `navigator.onLine`, retry, nem fila de submissão. Um checklist/parada enviado
+  numa conexão que cai é **simplesmente perdido** — o `fetch` rejeita, exibe `alert` e o motorista
+  precisa **redigitar tudo** (incl. redesenhar o mapa de avaria). Para o caso de uso central (motorista
+  em área de cobertura ruim) isso é uma fraqueza real de disponibilidade.
+  - **Atenuantes já existentes:** a recuperação server-side do **A6/A8** (`/bdv/ativo`,
+    `/checklist/pendente` + hidratação) protege contra **perda de contexto** (veiculo_id) por
+    eviction de `localStorage` no meio do fluxo; e os guards de duplicidade impedem **registro duplo**.
+    Então o problema é re-trabalho/UX, não corrupção.
+  - **Direção:** fila local (IndexedDB) + retry com backoff, idealmente via service worker
+    (Background Sync) — **exige HTTPS** (deploy público / Cloudflare). Decisão de produto: quanto de
+    offline o campo realmente exige. Relaciona-se ao item de PWA/HTTPS do checklist de deploy.
+
 ---
 
 ## 🟢 Baixo
@@ -960,6 +989,36 @@
   SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND EXTRA = 'auto_increment';
   ```
+
+- ⬜ **B21 — Dependência morta do jsPDF via CDN em `checklist.html` (peso + dependência de internet num app LAN)** *(auditoria mobile 2026-06-24)*
+  `checklist.html` carrega `jspdf.umd.min.js` + `jspdf.plugin.autotable.min.js` do **CDN externo**
+  (`cdnjs.cloudflare.com`), **render-blocking** (antes de `config.js`/`checklist.js`). Mas
+  `js/pdf-engine.js` (que define `gerarPDF`) **não é incluído em nenhuma página** e `gerarPDF` **nunca é
+  chamado** — o botão "FINALIZAR CHECKLIST E GERAR RELATÓRIO" só faz o POST, sem gerar PDF no cliente.
+  - **Impacto mobile:** ~150 KB+ de JS baixados à toa por celular **e**, pior, uma **dependência de
+    internet embutida num app de LAN** — se a LAN não tem saída para a internet, as requests ao cdnjs
+    **penduram/falham** e atrasam a interatividade da página de checklist.
+  - **Correção:** remover as duas tags de CDN (e o `pdf-engine.js` morto). Se PDF no cliente for
+    desejado, **self-hostar** o jsPDF localmente (servir do `:10081`), **nunca via CDN** num app de LAN.
+
+- ⬜ **B22 — Sem compressão (gzip/brotli) no backend** *(auditoria mobile 2026-06-24)*
+  Nenhum middleware de compressão (sem dep `compression`). JSON trafega cru — caro em rede móvel,
+  sobretudo relatórios com `mapa_avaria_base64` (base64 é altamente compressível, ~30–40% com gzip).
+  Payloads do motorista são pequenos; o ganho maior é nos relatórios admin. Mitigado em parte quando
+  o Cloudflare entrar (comprime no edge), mas `compression()` no Express é um ganho barato já na LAN.
+  Relaciona-se a **A11** (a correção real é não trafegar base64 em listas).
+
+- ⬜ **B23 — `veiculo.png` com cache-buster a cada checklist (re-download em dados móveis)** *(auditoria mobile 2026-06-24)*
+  `checklist.js` carrega a imagem do veículo com `?t=${timestamp}` (`inicializarCanvas`), **derrotando o
+  cache** — re-baixa uma imagem **estática** a cada abertura de checklist, gastando dados móveis. Remover
+  o cache-buster e deixar o navegador cachear (a imagem não muda).
+
+- ⬜ **B24 — Atributos de teclado mobile nos inputs** *(auditoria mobile 2026-06-24)*
+  Os inputs **críticos do motorista já estão certos** (`km` = `type=number` → teclado numérico;
+  `hora_*` = `datetime-local` → picker nativo; viewport presente em todas as páginas ✓). Pendências
+  menores: login `usuario` sem `inputmode`/`autocapitalize=off`/`autocorrect=off`/`autocomplete` (o
+  teclado mobile pode autocapitalizar/autocorrigir a matrícula); CPF (admin) é `type=text` e deveria ter
+  `inputmode=numeric`. Cosmético/UX — não bloqueia.
 
 - 🔴 **I1 — Windows Server 2012 fora de suporte / abaixo da baseline de tooling (risco de infraestrutura)**
   O servidor de produção roda **Windows Server 2012**, cujo suporte estendido terminou em
