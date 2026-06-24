@@ -446,6 +446,73 @@
   - Complementa, no backend, o override de hidratação do **A6** (que já evitava abrir o BDV no veículo
     errado pelo lado do frontend). UX de auto-roteamento dessas mensagens fica no **B12**.
 
+- ⬜ **A11 — Imagens base64 inline em `checklists` (maior gargalo de escalabilidade)** *(achado na auditoria de escala 2026-06-24)*
+  `mapa_avaria_base64` é `LONGTEXT` guardando um PNG em base64 **dentro da linha**, e vaza para os
+  caminhos de leitura mais quentes:
+  - `checklist.repository.findRelatorio` (dashboard admin) faz `SELECT` de `c.mapa_avaria_base64` em
+    **todas** as linhas (default 100); `admin.js` carrega o resultado inteiro — base64 incluso — em
+    `window.relatoriosCache` e renderiza tudo. Rede **e** memória do navegador seguram cada imagem de
+    cada checklist listado, mesmo na visão de lista.
+  - `findHistoricoByVeiculo` faz o mesmo no histórico do veículo.
+  - base64 infla o armazenamento **+33%**; o cap é **500 KB/imagem** (A4-H2). O payload típico medido
+    hoje (~1,1 kB) é função do quão pouco os motoristas desenham — não é um piso.
+  - Conforme `checklists` cresce, cada página de relatório puxa **MB por página** e segura uma conexão
+    do pool (de apenas 10) por toda a transferência → custo de armazenamento + banda + memória do
+    browser + starvation de pool, tudo junto. Relaciona-se a **M7/M8** (pool) e **B14** (retenção).
+  - **Correção (maior alavancagem):** (1) parar de selecionar `mapa_avaria_base64` em queries de
+    lista/relatório; adicionar endpoint de detalhe (`GET /api/checklist/:id/mapa`) que busca a imagem
+    só quando a linha é expandida (`admin.js::verDetalhes` já renderiza lazy — o dado é que não deve
+    trafegar na lista). (2) A prazo, mover as imagens para fora da linha (filesystem / object storage
+    Cloudflare R2/S3), guardando só a URL/chave — mantém a tabela `checklists` pequena e quente e torna
+    o particionamento/arquivamento (B14) trivial.
+
+- ⬜ **A12 — Índices ausentes em queries quentes** *(achado na auditoria de escala 2026-06-24)*
+  Não há DDL no repo (schema só vive no banco — ver **B17**), então confirmar no banco vivo. As
+  formas das queries indicam os índices necessários; todas rodam a cada page-load / submit, então
+  degradam de seek para full-scan conforme as tabelas crescem:
+  | Query | Roda em | Índice |
+  |-------|---------|--------|
+  | `findActiveBDVByMatricula` (`matricula=? AND status='aberto'`) | todo load de menu/checklist/bdv | `(matricula, status)` |
+  | `findActiveBDVByVeiculoId` (`veiculo_id=? AND status='aberto'`) | toda abertura de BDV | `(veiculo_id, status)` |
+  | `findPendingTodayByMatricula` | todo submit de checklist & abertura de BDV | `(matricula, data_inspecao)` + `bdv(checklist_id)` (ver **B4**) |
+  | `findRelatorio` / `findAllBDV` (`ORDER BY data_* DESC`) | todo relatório | índice em `data_inspecao` / `data_abertura` |
+  | `findHistoricoByVeiculo` (`veiculo_id=? ORDER BY data_inspecao DESC`) | histórico do veículo | `(veiculo_id, data_inspecao)` |
+  - **Confirmar que as colunas de FK são `FOREIGN KEY` reais** (`checklists.veiculo_id`/`matricula`,
+    `bdv.veiculo_id`/`matricula`, `bdv_paradas.bdv_id`): no MariaDB uma FK declarada cria o índice de
+    apoio automaticamente. Se forem só FKs lógicas, os JOINs de todo relatório fazem scan. C1 já criou
+    a FK de `bdv.checklist_id`; verificar as demais.
+  - Auditar o estado atual:
+    ```sql
+    SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) cols
+    FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()
+    GROUP BY TABLE_NAME, INDEX_NAME;
+    ```
+
+- ⬜ **A13 — Flag `km_override` é auto-reportada pelo cliente (bypass de auditoria)** *(achado na auditoria 2026-06-24)*
+  No caminho de correção (A7), `km_override` é um **booleano vindo do corpo** (schemas
+  `correcaoChecklist`/`correcaoBDV`/`correcaoParada`, default `false`). O `correcao.service` **não tem
+  guard monotônico por design** e **nunca** compara o KM novo contra `veiculos.km_atual`. Logo, um
+  vistoriador pode baixar um `km_entrada` abaixo da âncora e, deixando a flag em `false`, gravar
+  `km_override=0` **sem `motivo` obrigatório** (motivo só é exigido quando a flag é `true`).
+  - Isso **fura o objetivo §6.4**: "o vistoriador quebrou a monotonicidade de propósito" deveria ser um
+    evento de primeira classe filtrável; do jeito atual o evento pode ser silenciosamente omitido.
+  - **Correção:** **derivar** `km_override` no servidor (em `aplicarCorrecao`), comparando o valor novo
+    com a restrição monotônica (âncora do veículo / registros vizinhos), em vez de confiar no booleano —
+    e exigir `motivo` sempre que a flag derivada for `true`. Torna a trilha à prova de adulteração pelos
+    próprios operadores, que é o ponto da auditoria append-only.
+
+- ⬜ **A14 — Exposição de CPF / PII (LGPD)** *(achado na auditoria 2026-06-24)*
+  - `GET /veiculos/:id/historico` retorna `motorista_cpf` de **toda** inspeção do veículo a **qualquer
+    usuário autenticado** — qualquer motorista lê o **CPF** de outros motoristas (dado pessoal sensível
+    sob a LGPD) + os mapas de avaria. O **A3 #8** aceitou o IDOR de *histórico de frota* como
+    "single-tenant por design", mas não pesou o ângulo **CPF/LGPD**. **Correção:** remover
+    `motorista_cpf` do payload de histórico (não é necessário para renderizar) e reservar CPF a visões
+    admin-scoped. Vale também agora que o A7 expôs os relatórios admin ao vistoriador — decisão
+    consciente sobre supervisor ver CPF de todos.
+  - **Logs com PII:** `checklist.service` e `veiculo.repository.updateKm` fazem `console.log` de
+    matrícula/KM/tamanho do base64 em **toda** escrita, **sem gate de env** — PII + ruído de alto volume
+    em produção (LGPD + log-bloat). Estende o **B1**; passar tudo por um logger com níveis.
+
 ---
 
 ## 🟡 Médio
@@ -622,7 +689,12 @@
     binário nativo do bcrypt), **não alcançável no runtime do servidor** → **risco aceito** por ora.
     Eliminação real depende de trocar a cadeia nativa — ver **M5-b**.
 
-- ⬜ **M5-b — Avaliar migração `bcrypt` → `bcryptjs`** *(sessão dedicada)*
+- 🔵 **M5-b — Avaliar migração `bcrypt` → `bcryptjs`** *(aparentemente JÁ FEITO — confirmar e fechar — auditoria 2026-06-24)*
+  > ⚠️ **Auditoria 2026-06-24:** `package.json` já lista **`bcryptjs ^2.4.3`** (sem `bcrypt` nativo) e
+  > tanto `auth.service.js` quanto `scripts/migrate-passwords.js` já fazem `require('bcryptjs')`. Não há
+  > mais cadeia `@mapbox/node-pre-gyp`/`tar` — as 2 altas restantes do **M5** devem ter sumido junto.
+  > **Ação:** rodar `npm audit` para confirmar e então **fechar M5 e M5-b**.
+
   `bcryptjs` é puro-JS: remove `@mapbox/node-pre-gyp` + `tar` (zera as 2 altas restantes do M5) e
   elimina a dependência de build nativo. API quase drop-in. Requer ajuste em `auth.service.js` e no
   script `scripts/migrate-passwords.js`, além de teste no servidor (hashes `$2a$`/`$2b$` permanecem
@@ -641,6 +713,73 @@
   Item de **planejamento/arquitetura** — produzir um RFC/decisão antes de implementar. Bloqueante para
   a meta de negócio de venda externa.
 
+- ⬜ **M7 — Rate limiting além do login + `/health` como vetor de DoS** *(achado na auditoria 2026-06-24)*
+  Hoje só `POST /api/login` é limitado; o resto é irrestrito. O guard de checklist-por-dia já limita
+  bem o spam de checklist, mas:
+  - `GET /health` é **público, sem auth, e pega uma conexão do pool** (`SELECT 1`) a cada chamada.
+    Martelar `/health` pode **esgotar o pool de 10 conexões e derrubar o app inteiro**. Tornar a
+    resposta mais barata/cacheada e/ou limitar.
+  - As rotas de correção (A7) são irrestritas — um token de vistoriador comprometido inunda a auditoria
+    append-only.
+  - `addParada` não tem cap (ver **B16**).
+  - **Ação:** rate limiter global por IP/usuário antes de ir a público. Conecta ao store compartilhado
+    do **M2** (o limiter atual é in-memory / single-process).
+
+- ⬜ **M8 — Pool de conexões: `acquireTimeout` + teto de starvation** *(achado na auditoria 2026-06-24)*
+  Toda request segura uma conexão do pool (10) por toda a sua vida; queries de relatório (esp. com
+  base64, ver **A11**) seguram a sua pela transferência inteira. ~10 leituras lentas concorrentes
+  travam todas as escritas. O limiter in-memory do **M2** já prende o deploy a **single-process**,
+  então não dá para escalar horizontalmente para escapar disto — o caminho é baratear a query.
+  - **Ação:** definir `acquireTimeout` no pool (falha rápida em vez de pendurar a request); corrigir
+    **A11** (não trafegar base64 em listas) reduz o tempo que cada conexão fica presa.
+
+- ⬜ **M9 — Chokepoint central de escopo de tenant (pré-requisito arquitetural do M6)** *(achado na auditoria 2026-06-24)*
+  Hoje `coligada` viaja no JWT mas **nenhuma query escopa por ela** — cada repositório recebe filtros
+  explícitos e confia no chamador. Ao adicionar `tenant_id` (M6), o modo de falha é catastrófico e
+  silencioso: **um único `WHERE tenant_id=?` esquecido em ~20 métodos de repositório = vazamento entre
+  clientes.** Não retrofitar query-a-query na mão.
+  - **Ação:** arquitetar um chokepoint **antes** de escrever código de tenant — wrapper de repositório /
+    query builder que injeta o predicado de tenant centralmente, ou escopo de conexão por tenant — de
+    modo que "esqueci de filtrar" seja **estruturalmente impossível**, não uma esperança de code-review.
+    Subitem de planejamento do **M6**; pareia com **B10/B17** (migrations/schema versionado).
+
+- ⬜ **M10 — TOCTOU em `closeBDV` / paradas (re-lock dentro da transação)** *(achado na auditoria 2026-06-24)*
+  - `addParada` e `closeParada` rodam **sem transação e sem row-lock**: leem o BDV, checam
+    `status='aberto'` e a monotonicidade de KM, depois escrevem. Dois requests concorrentes (double-tap,
+    retry) podem ambos passar — paradas duplicadas, ou duas paradas que satisfazem um `lastParada.km`
+    obsoleto. Baixa severidade hoje (um motorista, um device), mas real.
+  - `closeBDV` lê o status do BDV **fora** da transação (fail-fast), abre a tx e trava só a linha do
+    **veículo**, sem re-checar o status do BDV sob o lock. Dois `encerrar` concorrentes podem ambos
+    prosseguir; o segundo sobrescreve `km_final` e re-roda `updateKm`.
+  - **Correção:** re-`SELECT ... FOR UPDATE` na linha do `bdv` dentro da transação e re-afirmar
+    `status='aberto'` antes de escrever (mesma disciplina do lock de veículo).
+
+- ⬜ **M11 — Reconciliação de drift da âncora de KM** *(achado na auditoria 2026-06-24)*
+  `veiculos.km_atual` é a âncora monotônica canônica, mas correções podem dessincronizá-la: o caminho de
+  override **não** realinha a âncora (§6.2 deixa o realinhamento como endpoint manual com helper de
+  recompute "disponível mas não auto-disparado"). Um vistoriador que corrige um registro mas esquece de
+  realinhar deixa o piso de KM do próximo motorista errado.
+  - **Ação:** ligar um **job periódico de reconciliação** (ou relatório admin "checar drift") que
+    sinalize qualquer veículo onde `km_atual ≠ MAX(último checklist km_entrada, último BDV encerrado
+    km_final)`. **Detecção, não auto-correção** — preserva o princípio §6.2 de "âncora é sempre decisão
+    explícita". O helper de recompute já existe.
+
+- ⬜ **M12 — Invariantes no nível do banco (defense-in-depth)** *(achado na auditoria 2026-06-24)*
+  Toda regra vive em código de app; uma escrita direta no banco, um segundo escritor futuro ou um bug
+  fura tudo. Adicionar invariantes no schema (MariaDB 10.4 impõe):
+  - `CHECK (km_atual >= 0)`, `CHECK (km_entrada >= 0)`, etc.
+  - "Um BDV aberto por veículo / por motorista" é imposto só por lógica de app + `FOR UPDATE`. O MariaDB
+    não tem índice único filtrado, mas dá para garantir com uma tabela pequena `bdv_ativos`
+    (`unique(veiculo_id)`, `unique(matricula)`) escrita na mesma transação. Hoje a serialização por
+    `FOR UPDATE` é adequada; revisitar se surgir um segundo caminho de escrita.
+
+- ⬜ **M13 — Enumeração de usuário por timing no login** *(achado na auditoria 2026-06-24)*
+  `authService.login` retorna **imediatamente** quando o usuário não existe, mas roda `bcrypt.compare`
+  (~100 ms) quando existe. Essa diferença de tempo permite enumerar `matricula`/`CPF` válidos — e CPF é
+  enumerável. O limiter por IP ajuda, mas é compartilhado por NAT e reseta no restart (M2).
+  - **Correção:** equalizar o tempo com um `bcrypt.compare` dummy no caminho "não encontrado". Considerar
+    lockout por conta no deploy público (pesando contra DoS-por-lockout).
+
 ---
 
 ## 🟢 Baixo
@@ -657,10 +796,19 @@
   `express.json({ limit: '50mb' })` é amplo (necessário para o mapa de avaria em base64).
   Avaliar reduzir o limite global e isolar o upload pesado em rota dedicada (superfície de DoS).
 
-- ⬜ **B4 — Query não-sargável no guard diário**
-  `findPendingTodayByMatricula` usa `DATE(data_inspecao) = CURDATE()` (não usa índice).
-  Irrelevante no volume atual; reescrever com range (`>= CURDATE() AND < CURDATE()+1`) se a
-  tabela `checklists` crescer.
+- ⬜ **B4 — Query não-sargável no guard diário** *(escopo ampliado na auditoria 2026-06-24)*
+  `findPendingTodayByMatricula` combina **dois** problemas de escala e roda nos dois caminhos de escrita
+  mais frequentes (todo submit de checklist & abertura de BDV):
+  - `DATE(data_inspecao) = CURDATE()` derrota qualquer índice em `data_inspecao`.
+  - `id NOT IN (SELECT checklist_id FROM bdv WHERE checklist_id IS NOT NULL)` faz um subquery que
+    varre `bdv` crescendo para sempre.
+  Reescrever sargável + anti-join (faz par com o índice `(matricula, data_inspecao)` do **A12**):
+  ```sql
+  WHERE c.matricula = ?
+    AND c.data_inspecao >= CURDATE() AND c.data_inspecao < CURDATE() + INTERVAL 1 DAY
+    AND NOT EXISTS (SELECT 1 FROM bdv b WHERE b.checklist_id = c.id)
+  ```
+  Fazer **antes** das tabelas crescerem, não depois.
 
 - ⬜ **B5 — Sem testes automatizados**
   Projeto não possui testes (decisão atual). Caso evolua, priorizar testes dos serviços
@@ -749,6 +897,51 @@
   **ignora o campo `json.code`** — não há roteamento automático (ex.: redirecionar para
   `checklist.html` em `CHECKLIST_REQUIRED`, ou trocar o veículo em `VEHICLE_MISMATCH`). O motorista
   é informado do que fazer, mas precisa navegar manualmente. **Nice-to-have de UX, não correção.**
+
+- ⬜ **B13 — Paginação keyset (OFFSET degrada em offsets profundos)** *(achado na auditoria 2026-06-24)*
+  `LIMIT ? OFFSET ?` (relatórios, histórico, correções) varre e descarta `N×pageSize` linhas em páginas
+  profundas. Irrelevante hoje; ao longo de anos de dados, paginação profunda fica lenta. Forma
+  future-proof: keyset/seek (`WHERE id < :lastId ORDER BY id DESC`).
+
+- ⬜ **B14 — Estratégia de retenção / particionamento** *(achado na auditoria 2026-06-24)*
+  Não há plano de retenção: `checklists`, `bdv`, `bdv_paradas`, `correcoes*` crescem para sempre. Ao
+  longo de muito tempo, `checklists` (com base64 inline) domina tudo. Planejar **particionamento por
+  ano** em `data_inspecao`/`data_abertura`, ou arquivamento de linhas frias. Fica **trivial** se as
+  imagens forem externalizadas antes (**A11**). Concretiza/expande o **B11** (STORAGE.md).
+
+- ⬜ **B15 — `itens_status` é JSON opaco em coluna TEXT** *(achado na auditoria 2026-06-24)*
+  Guardado como string serializada → não dá para consultar/indexar dentro ("todos os checklists com
+  freio=RUIM" = full-scan + parse no app). OK hoje; se analytics sobre condição de itens virar
+  requisito, usar tipo `JSON` nativo ou tabela normalizada `checklist_itens`.
+
+- ⬜ **B16 — Cap de paradas por BDV** *(achado na auditoria 2026-06-24)*
+  `addParada` não limita o número de paradas por BDV; um motorista (ou cliente malcomportado) pode
+  anexar paradas ilimitadas, cada uma com `observacao` de 1000 chars. DoS menor de amplificação de
+  armazenamento por usuário autenticado. Um cap sensato (ex.: 200 paradas/BDV) fecha. Relaciona-se a **M10**.
+
+- ⬜ **B17 — Versionar `schema.sql` no repositório** *(achado na auditoria 2026-06-24)*
+  O DDL só existe no banco vivo (sem `.sql` no repo; o CLAUDE.md é prosa). Além de ser o **B10**
+  (migrations), é um problema de **segurança de dados**: não há fonte de verdade versionada do schema —
+  perda do banco + deploy manual = reconstrução de memória. No mínimo, commitar um snapshot `schema.sql`
+  agora. Pré-requisito do **B10** e do **M9** (sync de schema entre tenants).
+
+- ⬜ **B18 — Drain do pool no shutdown gracioso** *(achado na auditoria 2026-06-24)*
+  SIGTERM/SIGINT fazem `process.exit(0)` sem drenar o pool — transações em voo são abandonadas. Menor;
+  adicionar `pool.end()` + drain curto quando o wrapper de serviço (**B8**) entrar.
+
+- ⬜ **B19 — `allowPublicKeyRetrieval: true` + TLS no banco** *(achado na auditoria 2026-06-24)*
+  Inócuo num banco localhost/LAN, mas se o MariaDB for para um host separado/gerenciado, essa flag +
+  conexão sem TLS é vetor de MITM/disclosure de credencial. Usar conexão TLS ao banco e remover a flag
+  quando o banco deixar de ser local. (`backend/src/config/database.js`.)
+
+- ⬜ **B20 — Verificar que colunas `auto_increment` são `BIGINT`** *(verificação única — auditoria 2026-06-24)*
+  Auto-increment **não** é risco real (BIGINT + InnoDB + validação antes do INSERT → overflow inatingível
+  no domínio; gaps por rollback são cosméticos). Único checup: confirmar no DDL vivo que nenhuma PK ficou
+  `INT` (teto 2,14 bi). Se ficou, `ALTER ... MODIFY ... BIGINT` enquanto as tabelas estão pequenas.
+  ```sql
+  SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND EXTRA = 'auto_increment';
+  ```
 
 - 🔴 **I1 — Windows Server 2012 fora de suporte / abaixo da baseline de tooling (risco de infraestrutura)**
   O servidor de produção roda **Windows Server 2012**, cujo suporte estendido terminou em
