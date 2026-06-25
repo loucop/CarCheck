@@ -1,0 +1,466 @@
+# BACKLOG (concluído) — CarCheck
+
+> Arquivo de **referência**: itens já **concluídos** (✅) e as porções já entregues de
+> itens em andamento (🔵), movidos para fora do `BACKLOG.md` ativo em **2026-06-25** para
+> reduzir o custo de tokens do backlog de trabalho. Raramente precisa ser carregado.
+>
+> O backlog **ativo** (pendentes + o que falta dos 🔵) vive em **`BACKLOG.md`**.
+>
+> Legenda: ⬜ pendente · 🔵 em andamento · ✅ concluído
+
+---
+
+## 🔴 Crítico — concluído
+
+- ✅ **C1 — Criar coluna `bdv.checklist_id` no MariaDB** *(aplicado em 2026-06-10)*
+  O código (`bdv.repository.js::createBDV`, `bdv.service.js`, `checklist.repository.js::findPendingTodayByMatricula`)
+  já lê/grava `checklist_id`, mas a coluna pode não existir no banco. Como o projeto
+  **não usa migrations** (alterações são manuais), enquanto a coluna não existir **toda
+  abertura de BDV lança erro em runtime**.
+  ```sql
+  ALTER TABLE bdv ADD COLUMN checklist_id BIGINT NULL,
+    ADD CONSTRAINT fk_bdv_checklist FOREIGN KEY (checklist_id) REFERENCES checklists(id);
+  ```
+  Aplicar em produção **antes** do próximo deploy. Validar fluxo de duas viagens no mesmo dia.
+
+---
+
+## 🟠 Alto — concluído
+
+- ✅ **A1 — Auditar XSS em todas as páginas admin** *(concluído em 2026-06-10)*
+  Auditadas todas as páginas admin. 6 lacunas corrigidas — destaque para o vetor **alto**:
+  `mapa_avaria_base64` (controlado pelo motorista) era inserido sem escape no `src` de `<img>`
+  em `admin.js` (stored XSS). Também corrigidos `formatarData` (fallback cru), `formatCPF` e
+  `nivelBadge` (fallbacks crus), e `escHtml` endurecido em `admin-bdv.html`/`admin-funcionarios.html`.
+  Pendência menor não crítica: `frota.js`/`checklist.js` (telas do motorista) não foram auditadas
+  neste escopo — ver **B7**.
+
+- ✅ **A2 — Restringir CORS** *(concluído em 2026-06-10)*
+  Allowlist de origens em `backend/index.js`. Host LAN `http://10.10.1.100:10081` sempre
+  permitido por padrão; origens extras via env `CORS_ORIGINS` (separadas por vírgula), sem
+  alterar código. Requests sem `Origin` (curl/health/apps nativos) continuam permitidos.
+  `.env.example` atualizado.
+  > ⚠️ **Ao publicar via Cloudflare:** adicionar o domínio público em `CORS_ORIGINS`
+  > (ex.: `CORS_ORIGINS=https://carcheck.seudominio.com`) no `.env` de produção, senão o
+  > frontend público será bloqueado pelo navegador.
+
+- ✅ **A3 — Submissão confia em `req.body.matricula` em vez de `req.user.matricula` (IDOR/spoof de identidade)** *(concluído em 2026-06-16 — deployado, testado e commitado)*
+  > ✅ **Gate de deploy+teste concluído (2026-06-16).** Os 4 arquivos backend foram deployados, o Node
+  > reiniciado, e os 4 testes de fronteira de identidade **passaram** no servidor — depois commitados
+  > (`fix: derive identity from JWT not request body + close BDV read IDOR (A3)`):
+  >    - **T1 — spoof de checklist:** ✅ logado como motorista A, `POST /checklist` com `matricula: <B>` no
+  >      corpo → checklist gravado sob **A** (JWT), campo do body ignorado.
+  >    - **T2 — guard de duplicidade usa o JWT:** ✅ A com checklist pendente do dia → novo `POST /checklist`
+  >      (com `matricula` de B no corpo) → **409** baseado em A, não no body.
+  >    - **T3 — IDOR de leitura de BDV:** ✅ A faz `GET /bdv/:id` de um BDV de B → **403**; do próprio → **200**.
+  >    - **T4 — admin preservado:** ✅ admin `GET /bdv/:id` de qualquer BDV → **200**; `admin-bdv.html` carrega
+  >      as contagens de paradas.
+
+  > ✅ **Auditoria + correção (2026-06-15):**
+  > - **#1 `POST /checklist` (vuln confirmada):** `matricula` removida do schema Zod `createChecklist`;
+  >   o controller injeta `{ ...req.body, matricula: req.user.matricula }`. O guard de duplicidade
+  >   (`findPendingTodayByMatricula`) e o `INSERT` agora usam o valor do JWT.
+  > - **#7 `GET /bdv/:id` (BOLA/IDOR de leitura, achado na auditoria):** `bdv.service.getBDV` agora
+  >   recebe o solicitante e exige `nivel_acesso === 'admin'` **OU** `bdv.matricula === req.user.matricula`,
+  >   senão 403. O relatório admin (`/admin/bdv` → `admin-bdv.html`) continua funcionando (role admin);
+  >   o motorista lê apenas o próprio BDV.
+  > - **Escritas de BDV já estavam corretas:** `open`/`paradas`/`encerrar` já usavam `req.user.matricula`
+  >   e o service já barrava `bdv.matricula !== matricula` com 403 — nenhuma mudança necessária.
+  > - **#8 `GET /veiculos/:id/historico` — aceito por ora:** qualquer usuário autenticado lê o histórico
+  >   de inspeções de **qualquer** veículo (dado de frota, não de usuário). **Aceito por design** no
+  >   modelo single-tenant atual; adicionar object-level authorization se/quando o produto for
+  >   multi-tenant (M6) ou se o histórico passar a conter dado sensível por motorista.
+  >   *(Atualização: o ângulo CPF/LGPD desse mesmo endpoint virou **A14** — ainda pendente.)*
+  > - **Nota M6:** `POST /admin/funcionarios` recebe `coligada`/`nivel_acesso` do body (dado de criação,
+  >   admin global — ok hoje). Sob multi-tenancy, escopar `coligada` ao tenant do admin; `coligada` ainda
+  >   **não** está no JWT, então isso exigirá incluí-la no token. Relaciona-se a M6.
+
+  **Achado original (referência):**
+  `checklist.service.js::createChecklist` recebe `req.body` direto do controller
+  (`checklist.controller.js`: `createChecklist(conn, req.body)`) e usa **`data.matricula`** tanto no
+  guard de duplicidade (`findPendingTodayByMatricula`) quanto no `INSERT` do checklist. A matrícula
+  **não** é derivada do JWT — qualquer cliente autenticado pode enviar a matrícula de **outro
+  motorista** no corpo e registrar checklist sob a identidade alheia (a camada Zod valida o formato,
+  não a posse). O frontend preenche `matricula` a partir de `localStorage.usuario`, mas o servidor
+  confia no que chega no body.
+  - **Correção:** o servidor deve **derivar a matrícula de `req.user`** (do token, populado pelo
+    `auth.middleware`) e **ignorar** qualquer `matricula` no corpo.
+  - **Mesmo audit nos endpoints de BDV:** confirmado que `open`/`paradas`/`encerrar` já usavam `req.user`.
+  - Risco real de **vazamento/atribuição cruzada entre motoristas**; agrava-se sob multi-tenancy (M6).
+    Relaciona-se a M4 (sessão via cookie) e M6.
+
+- ✅ **A4 — Endurecimento de validação de input (Zod) — limites de tamanho e schemas frouxos** *(concluído em 2026-06-17; verificado no servidor em 2026-06-18)*
+  Auditoria de validação/injeção em 2026-06-15. Camada Zod (`validate.middleware.js`) sem caps de
+  tamanho e com schemas permissivos.
+  > **✅ Concluído (2026-06-17) e verificado no servidor (2026-06-18):** H2 (2026-06-16) + **M1–M4 e L1**
+  > implementados. Validado por 16 asserções de comportamento contra os payloads reais do
+  > frontend (parse OK; malformados rejeitados; drop do `matricula` no `createChecklist` preservado).
+  > **Verificação no servidor (2026-06-18):** checklist real submetido pela UI retorna **201** com a
+  > validação de forma do M1, o formato base64 do M2 e o caminho não-strict do A3 (drop do `matricula`)
+  > todos ativos em produção.
+  > **L2** já estava coberto pelos caps do H2; **L3** é o único sub-item não endereçado (aceito na
+  > escala atual — ver nota abaixo).
+  - ✅ **H2 (alto) — sem `.max()` + `express.json({ limit: '50mb' })` = DoS/amplificação de armazenamento**
+    *(corrigido em 2026-06-16)*. Payload real medido (checklist com avaria desenhada) ≈ 1,1 kB → caps
+    apertados aplicados:
+    - **`.max()` em todos os campos string** sem limite (`validate.middleware.js`): `mapa_avaria_base64`
+      `500000`; branch string de `itens_status` `20000` (o branch `z.record` segue **sem cap** → A4-M1);
+      locais `200`, `observacao` `1000`, `hora_*`/`data_*` `32`, `combustivel_retorno` `50`,
+      `matricula`/`coligada`/`funcionario_id` `20`, `nome` `120`, `senha` `128`.
+    - **Limite de body por rota** (`index.js`): default global `100kb`; só `POST /api/checklist` → `1mb`
+      (via dispatcher — o parser global roda antes do router). Substitui o `50mb` global.
+    - **Handler 413** (`errorHandler.middleware.js`): `entity.too.large`/413 → JSON limpo
+      `"Requisição grande demais"` + novo código `PAYLOAD_TOO_LARGE`.
+    - ✅ **Deployado e verificado no servidor (2026-06-16):** checklist normal grava **201**; campo de
+      ~600 KB → **400** (cap Zod); body de 1,2 MB → **413 `PAYLOAD_TOO_LARGE`**; ciclo completo do
+      motorista (checklist + abrir BDV / paradas / encerrar) funciona.
+  - ✅ **M1 — forma de `itens_status` validada** *(2026-06-17)*: branch record agora é
+    `z.record(z.object({ status: z.string(), obs: z.string().optional() }))`. Permissivo nas chaves
+    (qualquer nome de item) e no `status` (string, não enum → não rejeita variação legada); `z.object`
+    interno não-strict tolera chaves extras. Branch string mantido (`min(1).max(20000)`).
+  - ✅ **M2 — formato de `mapa_avaria_base64` no schema** *(2026-06-17)*:
+    `.regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/)` (mesmo formato do render do admin);
+    `.max(500000)` e `.optional()` mantidos.
+  - ✅ **M3 — campos de data/hora validados** *(2026-06-17)*: `DATETIME_RE` compartilhado em
+    `addParada.hora_saida`, `closeParada.hora_chegada`, `relatorioBDV.data_inicio`/`data_fim`. Aceita
+    `YYYY-MM-DD` (input type=date) e `YYYY-MM-DDTHH:mm[:ss][.fff][Z|±hh:mm]` (datetime-local / ISO),
+    lenient p/ não quebrar o frontend; `.max(32)` mantido como teto.
+  - ✅ **M4 — `coligada` unificada** *(2026-06-17)*: `relatorioBDV.coligada` passou de
+    `z.string().max(20)` para `z.enum(['angels','cemax'])`, mantido `.optional()` (é filtro).
+  - ✅ **L1 — `.strict()` decidido por schema** *(2026-06-17)*: **strict (9):** `login`,
+    `createFuncionario`, `historicoVeiculo`, `openBDV`, `addParada`, `closeParada`, `closeBDV`,
+    `bdvParams`, `paradaParams`. **Não-strict (3):** `createChecklist` (**obrigatório** — A3 depende do
+    drop do `matricula` do body; comentado inline), `relatorioAdmin` e `relatorioBDV` (schemas de
+    **query** — toleram parâmetros avulsos da query string).
+  - ✅ **L2 — já coberto pelo H2:** os caps de `.max()` em `login`/`createFuncionario`
+    (`senha` 128, `matricula` 20, `nome` 120) foram aplicados no H2 (2026-06-16). Nada a fazer.
+  - ⬜ **L3 — `migrate-passwords.js` carrega todas as linhas sem `WHERE`** — **único sub-item não
+    endereçado.** Fora do escopo desta mudança (`validate.middleware.js`); ok na escala atual, revisitar
+    se `funcionarios` crescer. (O problema grave do script foi resolvido em **A5**.)
+
+- ✅ **A5 — `scripts/migrate-passwords.js` está quebrado e é destrutivo de dados** *(corrigido em 2026-06-16)*
+  > ✅ **Reconciliado e endurecido (2026-06-16).** O script foi reescrito:
+  > - **Colunas corrigidas:** `SELECT matricula, nome, senha`; `UPDATE ... SET senha = ? WHERE matricula = ?`
+  >   (PK `matricula`, coluna `senha` — alinhado a `funcionario.repository.js`).
+  > - **Detecção de bcrypt completa:** regex `^\$2[aby]\$` cobre `$2a$`/`$2b$`/`$2y$` (skip), só re-hasheia texto plano real.
+  > - **Null-guard:** linhas com `senha` nula/vazia são puladas antes de qualquer checagem de prefixo.
+  > - **Transação:** `beginTransaction` → loop → `commit`; erro no meio dispara `rollback` (nenhuma senha alterada).
+  > - **`--dry-run`** (read-only, reporta `[WOULD MIGRATE]` sem gravar) + **flag de segurança** `--i-know-its-fixed`
+  >   (ou `MIGRATE_PASSWORDS_CONFIRMED=1`) que TRAVA o modo de gravação com mensagem explicando o achado da auditoria.
+  > **Pré-execução recomendada:** rodar `--dry-run` contra o banco vivo + backup da tabela antes de gravar.
+  > Relaciona-se a M5-b (`bcrypt`→`bcryptjs`).
+
+  **Achado original (referência):** Achado na auditoria de 2026-06-15. **Não executar o script até ser reconciliado com o schema real.**
+  - **Colunas/PK erradas:** o script usava `SELECT id, nome, senha_hash FROM funcionarios` e
+    `UPDATE ... SET senha_hash = ? WHERE id = ?`. Mas, pelo schema e por **todos** os repositórios, a PK
+    é **`matricula`** (não há `id`) e a coluna de senha é **`senha`** (não há `senha_hash`).
+    - Pior caso: se existir uma coluna `senha_hash` obsoleta, migra o **campo errado** e deixa o `senha`
+      real intacto — divergência silenciosa e irreversível.
+  - **Detecção só de `$2b$`:** ignorava `$2a$`/`$2y$` (também bcrypt) → re-hash destrutivo e irreversível.
+  - **Sem null-guard / sem transação / sem dry-run / sem backup.** Tudo corrigido acima. Relaciona-se a M5-b.
+
+- ✅ **Auditoria de superfície de injeção SQL — limpa** *(2026-06-15)*
+  Revisados os **4 repositórios** (`bdv`, `checklist`, `funcionario`, `veiculo`). **Todas as queries
+  usam placeholders `?` com array de parâmetros — zero interpolação de input do usuário no SQL.** Os
+  dois construtores dinâmicos são seguros: `bdv.repository.js::findAllBDV` e
+  `checklist.repository.js::findRelatorio` concatenam apenas **fragmentos SQL constantes**
+  (`'b.matricula = ?'`, `' LIMIT ?'`) e empurram os valores para `params` (com `Number()` no
+  `limit`/`offset` do `findAllBDV`). Sem template literals com input interpolado e sem caminho de
+  injeção de segunda ordem. A regra "só repositórios tocam SQL" (CLAUDE.md) está sendo mantida.
+
+- ✅ **A6 — Soft-lock do motorista após checklist-sem-BDV** *(abordagem (a), escopo motorista — verificado no servidor 2026-06-17)*
+  > **✅ Verificado no servidor (2026-06-17):** órfão fresco do mesmo dia roteia o motorista para
+  > `bdv.html`, hidrata o **veículo CORRETO** (override de data-integrity confirmado — mostrou o veículo
+  > do órfão, não o `localStorage` obsoleto), o lock se mantém até o BDV ser concluído e **libera** após
+  > o encerramento. **Ciclo completo funciona.**
+  >
+  > **Progresso (2026-06-16):** implementado em duas fatias.
+  > - ✅ **Slice 1 (backend):** novo `GET /api/checklist/pendente` (repo `findPendingDetailTodayByMatricula`
+  >   com JOIN veiculos → `id, veiculo_id, km_entrada, placa, modelo`; service `getChecklistPendente`
+  >   espelhando `getBDVAtivo` com 200-ou-404 e BigInt→string; controller derivando a matrícula do
+  >   `req.user`; rota com `authenticate`).
+  > - ✅ **Slice 2 (frontend):** guard de roteamento em `menu.html` (load + pageshow) e `checklist.html`
+  >   (load + pageshow, check de órfão **gated a motorista**) — precedência `/bdv/ativo` → `bdv.html`;
+  >   senão `/checklist/pendente` → `bdv.html`. Auto-hidratação de `bdv.html` (`DOMContentLoaded`): quando
+  >   `localStorage.veiculo_id` está vazio, busca `/checklist/pendente`, grava veículo no localStorage e
+  >   segue; KM pré-preenchido por `preencherKmInicial`. Abrir o BDV reusa o auto-link do backend.
+  > - 🔧 **Fix override (2026-06-17):** a hidratação de `bdv.html` agora trata o **checklist órfão como
+  >   fonte da verdade do seu veículo** e **sobrepõe** qualquer `localStorage` obsoleto (antes só hidratava
+  >   quando vazio, podendo abrir o BDV no veículo errado).
+  > - ⚠️ **Premissa da abordagem (a):** assume que o órfão é um checklist **legítimo** — a recuperação
+  >   força o motorista a abrir/encerrar o BDV daquele checklist (único caminho de saída). A limpeza de
+  >   **órfão equivocado** é preocupação de **vistoriador → ver A7** (correção role-aware), não do motorista.
+
+  Se um motorista **envia o checklist mas sai antes de abrir o BDV**, o guard de duplicidade
+  (`findPendingTodayByMatricula`) bloqueava **qualquer novo checklist naquele dia** sem rota de
+  recuperação — motorista travado pelo resto do dia. Corrigido pela abordagem **(a)**: detectar o
+  checklist-sem-BDV e rotear o motorista para **abrir o BDV daquele checklist**.
+  - **Vistoriador faz inspeção sem viagem:** para **vistoriadores** um checklist é um **estado final
+    válido** — o fluxo de BDV e o guard de duplicidade **NÃO** se aplicam. A recuperação do A6 é escopada
+    **apenas a motoristas**. **Trabalho futuro (role-aware):** tornar o fluxo checklist→BDV ciente de
+    papel — relaciona-se a A7.
+
+- ✅ **A9 — `POST /api/bdv` sem `authorize`: qualquer usuário autenticado abre BDV** *(verificado no servidor 2026-06-17)*
+  > **✅ Verificado no servidor (2026-06-17):** modelo de três papéis aplicado na camada de rota —
+  > motorista chega ao `GET /bdv/ativo` (**404**, não bloqueado); admin e vistoriador recebem
+  > **403 `INSUFFICIENT_PERMISSION`** nas rotas de motorista; admin ainda acessa o `admin-bdv.html`
+  > via `GET /bdv/:id` sem gate (guard admin-OU-dono no service).
+  > **Fix implementado (2026-06-17):** `VISTORIADOR: 'vistoriador'` adicionado ao enum `ROLES`
+  > (`constants.js`), reconciliando com o enum `nivel_acesso` do banco. Gates `authorize` (após
+  > `authenticate`) em `routes/index.js`: `POST /bdv`, `GET /bdv/ativo`, `POST /bdv/:id/paradas`,
+  > `PATCH /bdv/:id/paradas/:paradaId`, `PATCH /bdv/:id/encerrar` → `authorize(MOTORISTA)`;
+  > `POST /checklist` → `authorize(MOTORISTA, VISTORIADOR)` (admin não inspeciona); `GET /checklist/pendente`
+  > → `authorize(MOTORISTA)`. `GET /bdv/:id` fica só com `authenticate` (o service já faz guard
+  > admin-OU-dono — gate grosseiro trancaria o admin).
+  > As rotas de **escrita de BDV** (`paradas`, `encerrar`) estão marcadas **A7-coupled**: podem ganhar
+  > `VISTORIADOR` quando o papel de override/supervisor entrar.
+  Liga-se ao trabalho role-aware de **A6/A7**.
+
+- ✅ **A10 — Vínculo estrito 1:1 checklist→BDV no `openBDV`** *(verificado no servidor 2026-06-17)*
+  > **✅ Verificado no servidor (2026-06-17):** sem checklist → **409 `CHECKLIST_REQUIRED`**;
+  > veículo divergente → **409 `VEHICLE_MISMATCH`**; checklist do mesmo veículo → **201** com o
+  > `checklist_id` corretamente vinculado.
+  O `openBDV` antes fazia auto-link **permissivo** (vinculava o checklist órfão do dia **se existisse**,
+  senão abria o BDV mesmo assim — podendo abrir no veículo errado). Agora o guard é **estrito**, dentro
+  da transação sob o row-lock do veículo: exige um checklist órfão do dia (`findPendingTodayByMatricula`,
+  agora também retornando `veiculo_id`) e compara `String(checklist.veiculo_id) === String(veiculo_id)`.
+  Dois códigos novos em `constants.js` (`CHECKLIST_REQUIRED`, `VEHICLE_MISMATCH`, ambos 409).
+  - Complementa, no backend, o override de hidratação do **A6**. UX de auto-roteamento dessas mensagens
+    fica no **B12** (ainda pendente).
+
+### A7 — Capacidades de correção/override do vistoriador — especificação completa (slices 1–3 ✅ em prod; slice 4 ativo em `BACKLOG.md`)
+
+O papel **vistoriador** deve poder: **(1)** definir/corrigir qualquer valor de **KM**, inclusive
+**sobrepondo a validação de monotonicidade do KM**; e **(2)** sinalizar e corrigir uma gama de erros em
+**checklists/BDVs**. É um papel de **override de nível supervisor**, distinto de **motorista**. Esta é a
+**especificação autoritativa de implementação**.
+
+#### Onde o guard de KM mora hoje (4 checagens, não 1)
+A monotonicidade não é uma checagem única — todas se ancoram em `veiculos.km_atual`, mutado sob
+`findByIdWithLock` (`SELECT … FOR UPDATE`):
+- `checklist.service.createChecklist` — `km_entrada < km_atual` → `KM_INVALID`; escreve `updateKm(km_entrada)`.
+- `bdv.service.openBDV` — `km_inicial < km_atual`; escreve `updateKm(km_inicial)`.
+- `bdv.service.addParada` — `km < lastParada.km` **e** `km < km_inicial`.
+- `bdv.service.closeBDV` — `km_final < km_inicial` **e** `km_final < maxParadaKm`; escreve `updateKm(km_final)`.
+
+`veiculos.km_atual` é a **âncora monotônica canônica**. Toda correção que mexe em KM precisa tratar
+`km_atual` como campo corrigível de primeira classe.
+
+#### (2) Trilha de auditoria — esquema de **duas tabelas** (decisão §6.4)
+Cabeçalho + diff por campo. Uma ação de correção = 1 linha de cabeçalho + N linhas de campo.
+**Append-only** (sem `UPDATE`/`DELETE`). Schema aplicado **manualmente** (sem migration).
+
+```sql
+-- Cabeçalho: uma linha por ação de correção (quem / quando / qual registro / por quê)
+CREATE TABLE correcoes (
+    id                    BIGINT       NOT NULL AUTO_INCREMENT,
+    vistoriador_matricula VARCHAR(20)  NOT NULL,            -- quem (FK funcionarios.matricula)
+    entidade              ENUM('checklist','bdv','bdv_parada','veiculo') NOT NULL,
+    entidade_id           BIGINT       NOT NULL,            -- qual registro
+    motivo                VARCHAR(500) NULL,                -- justificativa (ver §6.3)
+    km_override           TINYINT(1)   NOT NULL DEFAULT 0,  -- true se a monotonicidade foi burlada
+    coligada              VARCHAR(20)  NULL,                -- escopo de tenant (M6)
+    criado_em             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_entidade (entidade, entidade_id),
+    KEY idx_vistoriador (vistoriador_matricula),
+    KEY idx_criado_em (criado_em),
+    CONSTRAINT fk_correcoes_func FOREIGN KEY (vistoriador_matricula)
+        REFERENCES funcionarios (matricula)
+);
+
+-- Detalhe: uma linha por campo alterado
+CREATE TABLE correcoes_campos (
+    id            BIGINT      NOT NULL AUTO_INCREMENT,
+    correcao_id   BIGINT      NOT NULL,
+    campo         VARCHAR(64) NOT NULL,                     -- ex.: 'km_entrada', 'combustivel_retorno'
+    valor_antigo  TEXT        NULL,                         -- snapshot antes (string/JSON)
+    valor_novo    TEXT        NULL,                         -- snapshot depois
+    PRIMARY KEY (id),
+    KEY idx_correcao (correcao_id),
+    CONSTRAINT fk_campos_correcao FOREIGN KEY (correcao_id)
+        REFERENCES correcoes (id)
+);
+```
+
+Decisões embutidas: `valor_antigo`/`valor_novo` como **TEXT** não tipado (audita km numérico, status
+enum e `itens_status` JSON no mesmo lugar); **`km_override` no cabeçalho** (evento filtrável de primeira
+classe); **`coligada` desnormalizada** (auditoria por tenant sem join de volta); **append-only**.
+
+#### (3) Caminho de escrita separado: `correcao.service.js` (sem guard monotônico)
+**Princípio: NÃO adicionar `if (role === vistoriador) skip guard` dentro dos services do motorista.**
+Em vez disso, novo `correcao.service.js` com métodos próprios (`corrigirChecklist`, `corrigirBDV`,
+`corrigirParada`, `corrigirKmVeiculo`) que **simplesmente nunca chamam a checagem monotônica** — o
+bypass é a *ausência* do guard num caminho diferente e gated por papel. `checklist.service` /
+`bdv.service` ficam **intocados**. Disciplina de transação + lock preservada; o `INSERT` de auditoria
+acontece **na mesma transação** da correção (se a auditoria falhar, rollback — sem edições silenciosas).
+
+#### (1) Modelo de permissão — gate no nível de rota
+- **`authorize(ROLES.VISTORIADOR, ROLES.ADMIN)`** em todas as rotas `/api/correcoes/*`.
+- **Não** alargar o `authorize` das rotas de motorista — elas impõem ownership + monotonicidade, que é
+  exatamente o que uma correção **não** deve fazer. Correções vivem no namespace `/correcoes/*`.
+
+#### (4) Campos corrigíveis vs. imutáveis
+**Corrigíveis (com auditoria):**
+- `checklists`: `km_entrada`, `itens_status`, `local_origem`, `local_destino`, `mapa_avaria_base64`.
+- `bdv`: `km_inicial`, `km_final`, `combustivel_retorno`, `coligada`, `encerrado_fora_base`.
+- `bdv_paradas`: `km`, `hora_saida`, `hora_chegada`, `local_saida`, `local_chegada`, `observacao`.
+- `veiculos`: `km_atual` (a âncora).
+
+**Imutáveis (nunca editáveis):** chaves primárias; procedência `matricula`/`veiculo_id` (re-parentear é
+operação "reassign" separada, fora de escopo); `bdv.checklist_id` (vínculo 1:1 do A10); timestamps de
+sistema `data_abertura`/`data_encerramento`; **`bdv.status`** (§6.1: field-only, **sem reabertura**); as
+próprias tabelas de auditoria.
+
+#### §6 — Decisões resolvidas (2026-06-18)
+- **§6.1 — `bdv.status` imutável / correções field-only, sem reabertura.**
+- **§6.2 — Realinhamento de âncora: set explícito + helper de recompute, sem auto-recompute.** O
+  vistoriador **seta explicitamente** a âncora via `PATCH /api/correcoes/veiculo/:id/km` (sob row-lock).
+  Helper de recompute (`km_atual = MAX(último checklist km_entrada, último BDV encerrado km_final)`)
+  disponível mas **não** auto-disparado.
+- **§6.3 — `motivo` obrigatório quando `km_override = 1`, opcional caso contrário.**
+- **§6.4 — Auditoria em duas tabelas** (`correcoes` + `correcoes_campos`).
+
+#### Pré-requisito (entregue no slice 3) — acesso de leitura do vistoriador aos dashboards
+`GET /api/admin/relatorio` e `GET /api/admin/bdv` relaxados de `authorize(ADMIN)` para
+`authorize(VISTORIADOR, ADMIN)` — o vistoriador não pode corrigir o que não vê. Reconciliar com A3
+(acesso por objeto) e M6 (escopo de `coligada`/tenant). *(Nota: este relaxamento é o que torna o
+ângulo CPF/LGPD do **A14** mais agudo — supervisor passa a ver CPF de todos.)*
+
+#### Superfície de API (entregue)
+Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CSRF já cobre mutações.
+
+| Método | Path | Propósito |
+|--------|------|-----------|
+| PATCH | `/api/correcoes/checklist/:id` | Corrigir campos do checklist (body: campos + `motivo`) |
+| PATCH | `/api/correcoes/bdv/:id` | Corrigir campos do BDV |
+| PATCH | `/api/correcoes/bdv/:id/paradas/:paradaId` | Corrigir uma parada |
+| PATCH | `/api/correcoes/veiculo/:id/km` | Setar a âncora de KM do veículo (§6.2) |
+| GET | `/api/correcoes?entidade=&entidade_id=` | Ler o histórico de correções de um registro |
+
+#### Fatiamento de entrega
+1. ✅ **Tabelas de auditoria + `correcao.service` + endpoints PATCH** (checklist/bdv/parada) com gate
+   `authorize(VISTORIADOR, ADMIN)` e auditoria-na-mesma-transação. *(deployado e verificado em prod)*
+2. ✅ **Realinhamento de âncora** — `PATCH /correcoes/veiculo/:id/km` + helper de recompute (§6.2). *(prod)*
+3. ✅ **Endpoint de histórico** — `GET /api/correcoes` + leitura dos dashboards relaxada. *(prod)*
+4. ⬜ **UI** — **ainda pendente; rastreado no `BACKLOG.md` ativo (A7 slice 4).**
+
+> ⚠️ **Bug conhecido no backend já entregue:** `km_override` é auto-reportado pelo cliente →
+> rastreado como **A13** (pendente, em `BACKLOG.md`). Drift da âncora → **M11** (pendente).
+
+---
+
+## 🟡 Médio — concluído
+
+- ✅ **M3 — Vazamento de detalhes em erros 500** *(concluído em 2026-06-10)*
+  Branch genérico (500 inesperado) em `errorHandler.middleware.js` agora retorna mensagem
+  genérica quando `NODE_ENV === 'production'`, expondo `err.message` apenas em dev. Branches de
+  `err.statusCode` mantidos (mensagens hardcoded ou template com números validados). `.env.example`
+  passou a documentar `NODE_ENV` + `DB_CONNECTION_LIMIT`, `JWT_EXPIRES_IN`, `HOST`.
+  > Lembrete: `NODE_ENV=production` deve estar setado no deploy para o gate valer.
+
+- ✅ **M4 — JWT em localStorage + ausência de logout server-side** *(concluído em 2026-06-15)*
+  > ✅ **Fase 3 concluída (2026-06-15) — auth cookie-only, irreversível.**
+  > `auth.middleware.js`: removido o fallback do header `Authorization` (lê o token **só** do cookie
+  > httpOnly). `auth.controller.js`: o login **não retorna mais o token no body** — entrega só via
+  > cookie; o body devolve apenas `{ user }`. Com isto o M4 está completo (Fases 0→3): `JWT_EXPIRES_IN=2h`,
+  > sessão em cookie httpOnly, `POST /api/logout`, `GET /api/me`, CSRF por Origin/Referer, e todo o
+  > frontend migrado para `apiFetch`. Revogação real / refresh-token rotation seguem como **Opção D**
+  > (ao ir a público) — ver nota abaixo.
+  > ⚠️ **Deploy:** rodar `npm ci` + reiniciar o backend e validar login → fluxo completo → logout no
+  > servidor. Após este deploy, clientes que ainda enviem só o header `Authorization` recebem 401.
+
+  **Achado completo:**
+  - Token JWT guardado em `localStorage` → roubável via XSS (vetor que A1/S1 vêm mitigando).
+  - **Não existia endpoint de logout no backend.** Logout era 100% client-side (`localStorage.clear()`
+    + redirect). O JWT em si nunca era invalidado.
+  - **Sem revogação:** JWT stateless; um token capturado continuava válido até expirar.
+  - **Dispositivos compartilhados:** motoristas usam celulares/tablets compartilhados → janela de
+    exposição de um token vazado é grande.
+
+  > 🎯 **Opção D (arquitetura-alvo ao ir a público):** **refresh token rotation** — access token curto
+  > (~15 min) + refresh token rotativo e revogável (server-side). Permite logout real e revogação
+  > imediata. Conecta-se ao store compartilhado do **M2** (denylist/refresh store).
+
+  ### Plano de implementação (registro histórico — todas as fases concluídas)
+
+  **Decisões:** `cookie-parser` ✅ · helper `apiFetch` ✅ · CSRF por checagem de Origin ✅ · `GET /api/me` ✅
+
+  **Restrições de arquitetura:**
+  - Frontend `:10081` e backend `:3000` → **mesmo host (same-site), origem diferente (cross-origin)**.
+    Cookie `SameSite=Lax` é enviado; CORS precisa de `credentials: true` + origem específica + `fetch`
+    com `credentials: 'include'`.
+  - **HTTP na LAN agora, HTTPS (Cloudflare) depois** → flag `secure` do cookie dirigida por **env**
+    (`false` na LAN, `true` em produção). `SameSite=None` impossível em HTTP → usar `Lax`.
+  - **httpOnly quebra os guards client-side:** os ~30 `getItem('token')` usados como "estou logado?"
+    passaram a checar presença de **`usuario`** (UX) + tratamento de **401 → login** (enforcement real).
+
+  **Fase 0 — quick win:** `JWT_EXPIRES_IN=2h`.
+
+  **Fase 1 — Backend, retrocompatível** ✅ *(implementado em 2026-06-11)*
+  - `cookie-parser` instalado; CORS com `credentials:true` e allowlist extraída para `src/config/cors.js`
+    (fonte única, compartilhada com o CSRF).
+  - `src/utils/cookie.js` (nome do cookie + opções set/clear idênticas + `parseDurationMs` → `maxAge`
+    derivado de `JWT_EXPIRES_IN`).
+  - `login` grava cookie httpOnly (e ainda retornava token no body nesta fase); novos `logout` (limpa
+    cookie, público) e `me` (`GET /api/me`); `auth.middleware` dual-read (cookie primeiro, fallback header).
+  - `src/middlewares/csrf.middleware.js` (Origin/Referer vs. allowlist, global p/ métodos de escrita).
+  - `.env.example`: `COOKIE_SECURE` (dirige `secure`, **não** via NODE_ENV), `COOKIE_DOMAIN`,
+    `JWT_EXPIRES_IN=2h`.
+
+  **Fase 2 — Frontend (página por página)** ✅ *(concluída em 2026-06-15)*
+  - `config.js`: helper `apiFetch` com `credentials:'include'`; em 401 limpa estado, redireciona ao
+    login e lança Error com `isAuthRedirect` p/ o catch do chamador pular alertas duplicados.
+  - `auth.js`: login com `credentials:'include'`, **removido `setItem('token')`**.
+  - `menu.html`, `frota.js`+`selecao.html` (removido write morto de `veiculo_tipo`), `checklist.html`+
+    `checklist.js`, `bdv.html` (16 sites), fluxo admin (`admin.js`, `admin.html`, `admin-bdv.html`,
+    `admin-funcionarios.html`, `admin-dashboard.html`): guards `token`→`usuario`+nível; todas as chamadas
+    via `apiFetch`; 401 manual removido; `fazerLogout` → `POST /api/logout`. Navegação admin padronizada
+    no hub `admin-dashboard.html`.
+
+  **Fase 3 — Limpeza do backend** ✅ *(concluída em 2026-06-15, irreversível)*
+  - Removido o fallback de header `Authorization` (cookie-only); login parou de retornar `token` no body;
+    `JWT_EXPIRES_IN=2h` alinhado ao `maxAge` do cookie.
+  > ⚠️ Ao ir a público: virar `secure:true`; se frontend/API ficarem em sites realmente distintos, mudar
+  > para `SameSite=None; Secure` + **CSRF double-submit** → ponte para a **Opção D**.
+
+### M1 (porção concluída) — configuração do helmet no backend
+`helmet` instalado e configurado em `backend/index.js`: CSP com `script-src 'self'` + **nonce por
+requisição** (`res.locals.cspNonce`), `style-src 'self' 'unsafe-inline'`, `img-src 'self' data:` (mapa
+de avaria base64), `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`. `X-Powered-By`
+removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN). Helmet aplica
+`script-src-attr 'none'` por padrão → bloqueia handlers inline (ver M1-b).
+> ✅ **Decisão (opção A):** M1 fica como **endurecimento apenas do backend**. O CSP das **páginas HTML
+> do admin** (servidas pelo `:10081`) será entregue via **headers do Cloudflare** quando publicado (CSP
+> por **hash**, não nonce); reativar `hsts` (HTTPS) nessa etapa. *(M1-b/M1-c continuam pendentes em
+> `BACKLOG.md`.)*
+
+### M5 / M5-b (porção concluída) — histórico
+- ✅ `qs` (**moderada**, DoS remoto em `qs.stringify`) via `express` — **corrigido**: `express`
+  resolvido para `4.22.2` no `package-lock.json`.
+- ⚠️ `tar` ≤7.5.10 (**alta** ×2, path traversal na extração) via `@mapbox/node-pre-gyp` → `bcrypt`.
+  Não auto-corrigível; **exploração só em tempo de instalação**, não alcançável no runtime → risco
+  aceito por ora. Eliminação real dependia de trocar a cadeia nativa → M5-b.
+- **M5-b (bcryptjs):** `bcryptjs` é puro-JS, remove `@mapbox/node-pre-gyp` + `tar`, elimina build
+  nativo, API quase drop-in (hashes `$2a$`/`$2b$` permanecem compatíveis). **Auditoria 2026-06-24:**
+  `package.json` já lista `bcryptjs ^2.4.3` e o código já faz `require('bcryptjs')` → aparentemente já
+  feito. *(Confirmação `npm audit` + fechamento rastreados em `BACKLOG.md`.)*
+
+---
+
+## 🟢 Baixo — concluído
+
+- ✅ **B6 — Housekeeping do repositório** *(resolvido 2026-06-19)*
+  Remover arquivos vazios soltos no working dir (`git`, `main`) e decidir sobre `LICENSE` (untracked).
+  > **✅ Resolvido (2026-06-19):** os arquivos vazios `git`/`main` não existem mais; `LICENSE` foi
+  > **commitado/rastreado** (entrou no `d47f48e` via `git add -A`). Nada a ignorar.
+
+---
+
+## ✅ Concluído (referência) — série S e correções pontuais
+
+- ✅ **S1** — Escape de XSS em campos controlados no `admin.js` (`312a18d` + hardening em `29e3159`)
+- ✅ **S2** — Assertion de `JWT_SECRET` no startup (`9712695`)
+- ✅ **S3** — Rate limiting de login, 5 tentativas/IP/15min (`668ddc4`); refinado para contar só falhas + `trust proxy` (`29e3159`)
+- ✅ Persistência do link `checklist_id` no BDV (`29e3159`)
+- ✅ Correção de bypass do flow lock via botão voltar / bfcache (`f08ed77`, `a82b3d4`)
