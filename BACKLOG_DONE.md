@@ -435,16 +435,18 @@ removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN).
 > por **hash**, não nonce); reativar `hsts` (HTTPS) nessa etapa. *(M1-b/M1-c continuam pendentes em
 > `BACKLOG.md`.)*
 
-### M5 / M5-b (porção concluída) — histórico
-- ✅ `qs` (**moderada**, DoS remoto em `qs.stringify`) via `express` — **corrigido**: `express`
-  resolvido para `4.22.2` no `package-lock.json`.
-- ⚠️ `tar` ≤7.5.10 (**alta** ×2, path traversal na extração) via `@mapbox/node-pre-gyp` → `bcrypt`.
-  Não auto-corrigível; **exploração só em tempo de instalação**, não alcançável no runtime → risco
-  aceito por ora. Eliminação real dependia de trocar a cadeia nativa → M5-b.
-- **M5-b (bcryptjs):** `bcryptjs` é puro-JS, remove `@mapbox/node-pre-gyp` + `tar`, elimina build
-  nativo, API quase drop-in (hashes `$2a$`/`$2b$` permanecem compatíveis). **Auditoria 2026-06-24:**
-  `package.json` já lista `bcryptjs ^2.4.3` e o código já faz `require('bcryptjs')` → aparentemente já
-  feito. *(Confirmação `npm audit` + fechamento rastreados em `BACKLOG.md`.)*
+- ✅ **M5 / M5-b — Vulnerabilidades de dependências + migração `bcrypt`→`bcryptjs`** *(fechado em 2026-06-25 — `npm audit` no `backend/` → **0 vulnerabilidades**)*
+  - ✅ `qs` (**moderada**, DoS remoto em `qs.stringify`) via `express` — **corrigido**: `express`
+    resolvido para `4.22.2` no `package-lock.json`.
+  - ✅ `tar` ≤7.5.10 (**alta** ×2, path traversal na extração) via `@mapbox/node-pre-gyp` → `bcrypt`:
+    eram só exploráveis em tempo de instalação (extração do binário nativo do bcrypt), não no runtime.
+    **Eliminadas** ao trocar a cadeia nativa por `bcryptjs` (M5-b) — `package.json` lista `bcryptjs
+    ^2.4.3` (sem `bcrypt`) e a lockfile não tem mais `tar`/`@mapbox/node-pre-gyp`.
+  - ✅ **M5-b (bcryptjs):** `bcryptjs` puro-JS, remove `@mapbox/node-pre-gyp` + `tar`, elimina build
+    nativo, API drop-in (hashes `$2a$`/`$2b$` compatíveis). `auth.service.js` e
+    `scripts/migrate-passwords.js` já fazem `require('bcryptjs')`. **Confirmado em 2026-06-25** por
+    `npm audit --prefix backend` → `found 0 vulnerabilities`. Sem ação de servidor pendente (mudança já
+    no `package.json`/lockfile commitados).
 
 ---
 

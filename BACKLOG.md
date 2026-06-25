@@ -32,7 +32,6 @@
 | A14 | Back+LGPD | 🟠 | ⬜ | Remover CPF do histórico + logger com níveis |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
-| M5 | Deps | 🟡 | 🔵 | `npm audit` → fechar M5/M5-b (bcryptjs já está) |
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
 | M7 | Back/Infra | 🟡 | ⬜ | Rate limit global + `/health` como vetor de DoS |
 | M8 | Back/DB | 🟡 | ⬜ | Pool: `acquireTimeout` + teto de starvation |
@@ -193,13 +192,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   com múltiplas instâncias (PM2 cluster / réplicas). Migrar para store compartilhado (Redis)
   ou documentar que o deploy é single-process. Mensagem "15 minutos" está hardcoded — derivar
   de `LOGIN_WINDOW_MS`.
-
-- 🔵 **M5 / M5-b — Vulnerabilidades de dependências + migração `bcrypt`→`bcryptjs`** *(aparentemente já resolvido — confirmar e fechar)*
-  > ⚠️ **Auditoria 2026-06-24:** `package.json` já lista **`bcryptjs ^2.4.3`** (sem `bcrypt` nativo);
-  > `auth.service.js` e `scripts/migrate-passwords.js` já fazem `require('bcryptjs')`. Sem cadeia
-  > `@mapbox/node-pre-gyp`/`tar` → as 2 altas restantes do M5 devem ter sumido junto.
-  > **Ação:** rodar `npm audit` no servidor para confirmar e então **fechar M5 e M5-b.**
-  Histórico (qs/express corrigido; tar aceito; racional bcryptjs) → [`BACKLOG_DONE.md`](BACKLOG_DONE.md).
 
 - ⬜ **M6 — Planejamento de multi-tenancy (pré-requisito para vender a clientes externos)**
   Hoje o sistema é single-tenant (uma organização cliente). Antes de comercializar para **clientes
