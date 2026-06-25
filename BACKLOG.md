@@ -15,6 +15,64 @@
 
 ---
 
+## 🧭 Índice (escolha 1 item por sessão)
+
+> Carregue **só esta tabela** para escolher o trabalho da sessão; o corpo detalhado de cada
+> item está abaixo (faça `grep` pelo ID). Status: ⬜ pendente · 🔵 em andamento · ⛔ bloqueado.
+> Domínio: **Front** (UI/JS cliente) · **Back** (Express/serviço) · **DB** (schema/queries) ·
+> **Infra** (deploy/SO/processo) · **Arch** (multi-tenancy) · **Deps**/**Test**/**Docs**.
+
+| ID | Domínio | Pri | St | Resumo |
+|------|-----------|----|----|--------|
+| A7 | Front | 🟠 | 🔵 | UI de correção do vistoriador (slice 4; backend pronto) |
+| A8 | Front | 🟠 | 🔵 | Ordem dos guards em `bdv.html` (pendente verificação) |
+| A11 | Back+DB | 🟠 | ⬜ | Tirar base64 das queries de lista (+ endpoint de detalhe) |
+| A12 | DB | 🟠 | ⬜ | Índices em queries quentes (confirmar no banco vivo) |
+| A13 | Back | 🟠 | ⬜ | Derivar `km_override` no servidor (bug de auditoria do A7) |
+| A14 | Back+LGPD | 🟠 | ⬜ | Remover CPF do histórico + logger com níveis |
+| M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
+| M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
+| M5 | Deps | 🟡 | 🔵 | `npm audit` → fechar M5/M5-b (bcryptjs já está) |
+| M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
+| M7 | Back/Infra | 🟡 | ⬜ | Rate limit global + `/health` como vetor de DoS |
+| M8 | Back/DB | 🟡 | ⬜ | Pool: `acquireTimeout` + teto de starvation |
+| M9 | Arch | 🟡 | ⬜ | Chokepoint central de escopo de tenant (pré-req M6) |
+| M10 | Back | 🟡 | ⬜ | TOCTOU em `closeBDV`/paradas (re-lock na transação) |
+| M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
+| M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
+| M13 | Back | 🟡 | ⬜ | Enumeração de usuário por timing no login |
+| M14 | Front | 🟡 | ⬜ | Resiliência móvel (timeout + guard de double-submit) |
+| M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
+| B1 | Front+Back | 🟢 | ⬜ | Remover `console.log` de debug (PII no console) |
+| B2 | Back | 🟢 | ⬜ | Política de senha mais forte |
+| B3 | Back | 🟢 | ⬜ | Limite de payload (rever se ainda distinto vs A4) |
+| B4 | Back+DB | 🟢 | ⬜ | Query não-sargável no guard diário (sargável + anti-join) |
+| B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
+| B7 | Front | 🟢 | 🔵 | XSS nas telas do motorista (2 fixes: frota.js, bdv.html) |
+| M1-b | Front | 🟢 | ⬜ | Handlers inline `on*=` → `addEventListener` (sub-M1) |
+| M1-c | Front | 🟢 | ⬜ | Estilos inline → CSS (sub-M1) |
+| B8 | Infra | 🟢 | ⛔ | NSSM serviço Windows (config ✅; instalação exige admin) |
+| B9 | Test | 🟢 | ⬜ | Suíte de testes de integração (rotas da API) |
+| B10 | DB/Infra | 🟢 | ⬜ | Sistema de migrations de banco (pré-req M6) |
+| B11 | Docs/DB | 🟢 | ⬜ | `STORAGE.md` (medir tamanho real em produção) |
+| B12 | Front | 🟢 | ⬜ | `bdv.html` ignora `json.code` (sem auto-roteamento) |
+| B13 | Back+DB | 🟢 | ⬜ | Paginação keyset (OFFSET degrada em offsets profundos) |
+| B14 | DB/Infra | 🟢 | ⬜ | Estratégia de retenção / particionamento |
+| B15 | DB | 🟢 | ⬜ | `itens_status` JSON opaco em coluna TEXT |
+| B16 | Back | 🟢 | ⬜ | Cap de paradas por BDV |
+| B17 | DB/Infra | 🟢 | ⬜ | Versionar `schema.sql` no repo (pré-req B10/M9) |
+| B18 | Back | 🟢 | ⬜ | Drain do pool no shutdown gracioso |
+| B19 | Back/Infra | 🟢 | ⬜ | TLS no banco + remover `allowPublicKeyRetrieval` |
+| B20 | DB | 🟢 | ⬜ | Verificar que `auto_increment` é `BIGINT` (checup único) |
+| B21 | Front | 🟢 | ⬜ | jsPDF via CDN morto em `checklist.html` (app LAN) |
+| B22 | Back | 🟢 | ⬜ | Sem compressão (gzip/brotli) no backend |
+| B23 | Front | 🟢 | ⬜ | Cache-buster em `veiculo.png` (re-download móvel) |
+| B24 | Front | 🟢 | ⬜ | Atributos de teclado mobile nos inputs |
+| I1 | Infra | 🔴 | ⬜ | Windows Server 2012 fora de suporte (bloqueia público) |
+| Deploy | Infra | — | ⬜ | Checklist de produção (HTTPS, CORS, CSP, HSTS, trust proxy) |
+
+---
+
 ## 🔴 Crítico
 
 _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_DONE.md).)
