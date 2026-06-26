@@ -26,7 +26,6 @@
 |------|-----------|----|----|--------|
 | A7 | Front | 🟠 | 🔵 | UI de correção do vistoriador (slice 4; backend pronto) |
 | A8 | Front | 🟠 | 🔵 | Ordem dos guards em `bdv.html` (pendente verificação) |
-| A11 | Back+DB | 🟠 | ⬜ | Tirar base64 das queries de lista (+ endpoint de detalhe) |
 | A12 | DB | 🟠 | ⬜ | Índices em queries quentes (confirmar no banco vivo) |
 | A14 | Back+LGPD | 🟠 | ⬜ | Remover CPF do histórico + logger com níveis |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
@@ -108,25 +107,12 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   - Separado do **A6** (recuperação de órfão): aqui o BDV **existe e está aberto** — é a ordem dos guards
     que impede chegar até ele.
 
-- ⬜ **A11 — Imagens base64 inline em `checklists` (maior gargalo de escalabilidade)** *(achado na auditoria de escala 2026-06-24)*
-  `mapa_avaria_base64` é `LONGTEXT` guardando um PNG em base64 **dentro da linha**, e vaza para os
-  caminhos de leitura mais quentes:
-  - `checklist.repository.findRelatorio` (dashboard admin) faz `SELECT` de `c.mapa_avaria_base64` em
-    **todas** as linhas (default 100); `admin.js` carrega o resultado inteiro — base64 incluso — em
-    `window.relatoriosCache` e renderiza tudo. Rede **e** memória do navegador seguram cada imagem de
-    cada checklist listado, mesmo na visão de lista.
-  - `findHistoricoByVeiculo` faz o mesmo no histórico do veículo.
-  - base64 infla o armazenamento **+33%**; o cap é **500 KB/imagem** (A4-H2). O payload típico medido
-    hoje (~1,1 kB) é função do quão pouco os motoristas desenham — não é um piso.
-  - Conforme `checklists` cresce, cada página de relatório puxa **MB por página** e segura uma conexão
-    do pool (de apenas 10) por toda a transferência → custo de armazenamento + banda + memória do
-    browser + starvation de pool, tudo junto. Relaciona-se a **M7/M8** (pool) e **B14** (retenção).
-  - **Correção (maior alavancagem):** (1) parar de selecionar `mapa_avaria_base64` em queries de
-    lista/relatório; adicionar endpoint de detalhe (`GET /api/checklist/:id/mapa`) que busca a imagem
-    só quando a linha é expandida (`admin.js::verDetalhes` já renderiza lazy — o dado é que não deve
-    trafegar na lista). (2) A prazo, mover as imagens para fora da linha (filesystem / object storage
-    Cloudflare R2/S3), guardando só a URL/chave — mantém a tabela `checklists` pequena e quente e torna
-    o particionamento/arquivamento (B14) trivial.
+- ⬜ **A11 fase 2 — Externalizar imagens para fora da linha (object storage)** *(diferida; fase 1 concluída — ver `BACKLOG_DONE.md`)*
+  A fase 1 (não trafegar `mapa_avaria_base64` em listas + endpoint de detalhe sob demanda) está
+  **concluída**. Resta a fase 2, de maior fôlego e dependente de infra: mover o PNG para fora da linha
+  (filesystem / object storage Cloudflare R2/S3), guardando só a URL/chave — mantém `checklists`
+  pequena/quente e torna o particionamento/arquivamento trivial. Pareia com **B14** (retenção) e só
+  vale a pena junto da publicação/Cloudflare.
 
 - ⬜ **A12 — Índices ausentes em queries quentes** *(achado na auditoria de escala 2026-06-24)*
   Não há DDL no repo (schema só vive no banco — ver **B17**), então confirmar no banco vivo. As
@@ -211,8 +197,8 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   base64, ver **A11**) seguram a sua pela transferência inteira. ~10 leituras lentas concorrentes
   travam todas as escritas. O limiter in-memory do **M2** já prende o deploy a **single-process**,
   então não dá para escalar horizontalmente para escapar disto — o caminho é baratear a query.
-  - **Ação:** definir `acquireTimeout` no pool (falha rápida em vez de pendurar a request); corrigir
-    **A11** (não trafegar base64 em listas) reduz o tempo que cada conexão fica presa.
+  - **Ação:** definir `acquireTimeout` no pool (falha rápida em vez de pendurar a request); o **A11**
+    (base64 fora das listas, **concluído**) já reduziu o tempo que cada conexão fica presa.
 
 - ⬜ **M9 — Chokepoint central de escopo de tenant (pré-requisito arquitetural do M6)** *(achado na auditoria 2026-06-24)*
   Hoje `coligada` viaja no JWT mas **nenhuma query escopa por ela** — cada repositório recebe filtros
@@ -426,7 +412,7 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   Não há plano de retenção: `checklists`, `bdv`, `bdv_paradas`, `correcoes*` crescem para sempre. Ao
   longo de muito tempo, `checklists` (com base64 inline) domina tudo. Planejar **particionamento por
   ano** em `data_inspecao`/`data_abertura`, ou arquivamento de linhas frias. Fica **trivial** se as
-  imagens forem externalizadas antes (**A11**). Concretiza/expande o **B11** (STORAGE.md).
+  imagens forem externalizadas antes (**A11 fase 2**, diferida). Concretiza/expande o **B11** (STORAGE.md).
 
 - ⬜ **B15 — `itens_status` é JSON opaco em coluna TEXT** *(achado na auditoria 2026-06-24)*
   Guardado como string serializada → não dá para consultar/indexar dentro ("todos os checklists com
@@ -478,7 +464,7 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   sobretudo relatórios com `mapa_avaria_base64` (base64 é altamente compressível, ~30–40% com gzip).
   Payloads do motorista são pequenos; o ganho maior é nos relatórios admin. Mitigado em parte quando
   o Cloudflare entrar (comprime no edge), mas `compression()` no Express é um ganho barato já na LAN.
-  Relaciona-se a **A11** (a correção real é não trafegar base64 em listas).
+  Relaciona-se a **A11** (**concluído** — base64 já não trafega nas listas).
 
 - ⬜ **B23 — `veiculo.png` com cache-buster a cada checklist (re-download em dados móveis)** *(auditoria mobile 2026-06-24)*
   `checklist.js` carrega a imagem do veículo com `?t=${timestamp}` (`inicializarCanvas`), **derrotando o

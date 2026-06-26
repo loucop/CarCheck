@@ -92,6 +92,11 @@ const schemas = {
         id: z.coerce.number().int().positive('ID do veículo inválido')
     }).strict(),
 
+    // A11: :id de GET /checklist/:id/mapa (detalhe da imagem sob demanda).
+    checklistMapaParams: z.object({
+        id: z.coerce.number().int().positive('ID do checklist inválido')
+    }).strict(),
+
     // A4-L1: schema de QUERY — não-strict de propósito. Query strings frequentemente
     // carregam parâmetros avulsos (cache-buster, paginação de UI); .strict() os
     // transformaria em 400. Chaves desconhecidas são descartadas.

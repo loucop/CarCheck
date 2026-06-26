@@ -112,6 +112,31 @@ const checklistController = {
       }
     }
   },
+
+  /**
+   * GET /api/checklist/:id/mapa
+   * A11: imagem de avaria de um checklist, sob demanda (fora das listas).
+   */
+  async getMapa(req, res, next) {
+    let conn;
+
+    try {
+      conn = await pool.getConnection();
+
+      const { id } = req.params;
+      const data = await checklistService.getMapaChecklist(conn, parseInt(id));
+
+      return response.success(res, data);
+
+    } catch (err) {
+      return next(err);
+
+    } finally {
+      if (conn) {
+        conn.release();
+      }
+    }
+  },
 };
 
 module.exports = checklistController;

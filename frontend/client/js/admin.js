@@ -233,22 +233,51 @@ function verDetalhes(id) {
         </div>
     `;
 
-    // Mapa de avarias
+    // Mapa de avarias — A11: o base64 não vem mais no cache da lista; a imagem é
+    // buscada sob demanda (carregarMapaAvaria) e injetada após abrir o modal.
     const mapaHTML = `
         <div style="margin-top: 15px;">
             <h4 style="color: #f8fafc;">Mapa de Avarias (Lataria):</h4>
-            ${registro.mapa_avaria_base64
-                && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(registro.mapa_avaria_base64)
-                && registro.mapa_avaria_base64.length > 100
-                ? `<img src="${escHtml(registro.mapa_avaria_base64)}"
-                       style="max-width:100%; border:2px solid #334155; border-radius:8px;">`
-                : '<p style="padding:20px; text-align:center; color:#94a3b8; background: #0f172a; border-radius: 8px;">Nenhuma avaria marcada no mapa</p>'
-            }
+            <div id="mapaAvariaContainer">
+                <p style="padding:20px; text-align:center; color:#94a3b8; background: #0f172a; border-radius: 8px;">Carregando mapa…</p>
+            </div>
         </div>
     `;
 
     container.innerHTML = rotaHTML + itensHTML + mapaHTML;
     modal.style.display = "flex";
+
+    carregarMapaAvaria(id);
+}
+
+// A11: busca a imagem de avaria de um checklist sob demanda e a injeta no modal,
+// mantendo o mesmo guard de XSS (regex de data-URI + escHtml) que antes rodava
+// sobre o dado em cache. Distingue "sem avaria" de "falha de carregamento".
+async function carregarMapaAvaria(id) {
+    const alvo = document.getElementById("mapaAvariaContainer");
+    if (!alvo) return;
+
+    const semAvaria = '<p style="padding:20px; text-align:center; color:#94a3b8; background: #0f172a; border-radius: 8px;">Nenhuma avaria marcada no mapa</p>';
+
+    try {
+        const resposta = await apiFetch(`/checklist/${id}/mapa`);
+        if (!resposta.ok) throw new Error("Erro ao carregar mapa");
+
+        const resultado = await resposta.json();
+        const base64 = (resultado.data || resultado).mapa_avaria_base64;
+
+        if (base64
+            && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(base64)
+            && base64.length > 100) {
+            alvo.innerHTML = `<img src="${escHtml(base64)}"
+                       style="max-width:100%; border:2px solid #334155; border-radius:8px;">`;
+        } else {
+            alvo.innerHTML = semAvaria;
+        }
+    } catch (erro) {
+        if (erro && erro.isAuthRedirect) return;
+        alvo.innerHTML = '<p style="padding:20px; text-align:center; color:#ef4444; background: #0f172a; border-radius: 8px;">Falha ao carregar o mapa de avarias.</p>';
+    }
 }
 
 function fecharModal() {

@@ -137,6 +137,24 @@ const checklistService = {
             id: String(item.id),
             veiculo_id: String(item.veiculo_id)
         }));
+    },
+
+    // A11: imagem de avaria de um checklist, buscada sob demanda (não trafega nas
+    // listas). 404 quando o checklist não existe; mapa_avaria_base64 pode ser null
+    // (checklist sem desenho) — o frontend trata isso como "sem avaria marcada".
+    async getMapaChecklist(conn, id) {
+        const row = await checklistRepository.findMapaById(conn, id);
+        if (!row) {
+            throw {
+                message: 'Checklist não encontrado',
+                code: ERROR_CODES.RESOURCE_NOT_FOUND,
+                statusCode: 404
+            };
+        }
+        return {
+            id: String(row.id),
+            mapa_avaria_base64: row.mapa_avaria_base64 ?? null
+        };
     }
 };
 

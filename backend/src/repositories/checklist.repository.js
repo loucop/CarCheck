@@ -17,16 +17,18 @@ const checklistRepository = {
         return result.insertId;
     },
 
+    // A11: NÃO seleciona mapa_avaria_base64 — o histórico só renderiza
+    // data/motorista/KM/rota; a imagem (LONGTEXT, até 500 KB) viajava sem uso.
+    // O detalhe da imagem é servido sob demanda por findMapaById (GET /checklist/:id/mapa).
     async findHistoricoByVeiculo(conn, veiculoId, limit, offset) {
         const query = `
-            SELECT 
+            SELECT
                 c.id,
                 c.km_entrada,
                 c.local_origem,
                 c.local_destino,
                 c.data_inspecao,
                 c.itens_status,
-                c.mapa_avaria_base64,
                 f.nome as motorista,
                 f.cpf as motorista_cpf
             FROM checklists c
@@ -78,21 +80,24 @@ const checklistRepository = {
         return rows.length > 0 ? rows[0] : null;
     },
 
+    // A11: NÃO seleciona mapa_avaria_base64 — antes vinha em TODAS as linhas do
+    // relatório (default 100), inflando o payload em MB e segurando uma conexão do
+    // pool pela transferência inteira. A imagem é buscada por linha, sob demanda,
+    // via findMapaById quando o admin abre o detalhe.
     async findRelatorio(conn, funcionarioMatricula, limit, offset) {
         let query = `
-            SELECT 
-                c.id, 
+            SELECT
+                c.id,
                 c.veiculo_id,
-                v.placa, 
+                v.placa,
                 v.modelo,
                 f.nome as motorista,
                 f.cpf as motorista_cpf,
                 f.matricula as motorista_matricula,
-                c.km_entrada, 
+                c.km_entrada,
                 c.local_origem,
                 c.local_destino,
-                c.data_inspecao, 
-                c.mapa_avaria_base64,
+                c.data_inspecao,
                 c.itens_status
             FROM checklists c
             LEFT JOIN veiculos v ON v.id = c.veiculo_id
@@ -110,6 +115,14 @@ const checklistRepository = {
         params.push(limit, offset);
 
         return await conn.query(query, params);
+    },
+
+    // A11: detalhe sob demanda — só a imagem de UM checklist, fora dos caminhos de
+    // lista. Distingue "checklist inexistente" (null) de "sem imagem" (campo null).
+    async findMapaById(conn, id) {
+        const query = `SELECT id, mapa_avaria_base64 FROM checklists WHERE id = ? LIMIT 1`;
+        const rows = await conn.query(query, [id]);
+        return rows[0] || null;
     },
 };
 

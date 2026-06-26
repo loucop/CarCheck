@@ -102,6 +102,19 @@ router.get(
     checklistController.getPendente
 );
 
+/**
+ * GET /api/checklist/:id/mapa
+ * A11: imagem de avaria de um checklist, sob demanda. Mesma audiência do relatório
+ * admin (vistoriador + admin) — é só o modal de detalhe que precisa da imagem.
+ */
+router.get(
+    '/checklist/:id/mapa',
+    authenticate,
+    authorize(ROLES.VISTORIADOR, ROLES.ADMIN),
+    validate(schemas.checklistMapaParams, 'params'),
+    checklistController.getMapa
+);
+
 // ==========================================
 // ROTAS DE BDV (Autenticadas)
 // ==========================================

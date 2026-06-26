@@ -362,6 +362,23 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
     motivo → **200** + auditoria `km_override=1` (corpo dizia `false`); aumentar KM → **200** +
     `km_override=0`. Mesmo comportamento confirmado em `bdv.km_final`. Dados de teste restaurados.
 
+- ✅ **A11 (fase 1) — Tirar base64 das queries de lista + endpoint de detalhe sob demanda** *(concluído em 2026-06-26 — deployado, testado e commitado)*
+  `mapa_avaria_base64` (`LONGTEXT`, PNG inline, até 500 KB) vinha em **todas** as linhas dos caminhos
+  de leitura mais quentes — relatório admin (`findRelatorio`, default 100 linhas) e histórico do
+  veículo (`findHistoricoByVeiculo`, que nem renderiza a imagem) — inflando payload, banda, memória do
+  browser e tempo de conexão presa no pool (10).
+  - **Correção:** removido `c.mapa_avaria_base64` dos dois `SELECT` de lista; novo
+    `findMapaById` + **`GET /api/checklist/:id/mapa`** (service `getMapaChecklist`, controller `getMapa`,
+    schema `checklistMapaParams`) gated em `authorize(VISTORIADOR, ADMIN)`. No front, `admin.js::verDetalhes`
+    virou lazy: mostra "Carregando mapa…" e busca a imagem via `carregarMapaAvaria` ao abrir o modal,
+    mantendo o guard de XSS (regex data-URI + `escHtml`). Sem mudança de schema — só caminho de leitura.
+  - **Testado no servidor (admin, curl):** `/admin/relatorio?limit=5` caiu de **~800 KB → ~60 KB** e
+    **0** ocorrências de base64; idem `/veiculos/:id/historico`. `GET /checklist/53/mapa` → **200** com
+    o PNG (172 KB); inexistente → **404**; id inválido → **400**; sem cookie → **401**. UI: modal carrega
+    o mapa lazy. (Blank-map ainda renderiza `<img>` — comportamento **pré-existente**, fora do escopo.)
+  - **Fase 2 (diferida):** mover as imagens para fora da linha (object storage R2/S3) — rastreada no
+    `BACKLOG.md` ativo, pareia com **B14**.
+
 ---
 
 ## 🟡 Médio — concluído
