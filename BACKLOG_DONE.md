@@ -345,8 +345,22 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 3. ✅ **Endpoint de histórico** — `GET /api/correcoes` + leitura dos dashboards relaxada. *(prod)*
 4. ⬜ **UI** — **ainda pendente; rastreado no `BACKLOG.md` ativo (A7 slice 4).**
 
-> ⚠️ **Bug conhecido no backend já entregue:** `km_override` é auto-reportado pelo cliente →
-> rastreado como **A13** (pendente, em `BACKLOG.md`). Drift da âncora → **M11** (pendente).
+> ⚠️ **Bug conhecido no backend já entregue:** `km_override` era auto-reportado pelo cliente →
+> corrigido em **A13** (abaixo). Drift da âncora → **M11** (pendente, em `BACKLOG.md`).
+
+- ✅ **A13 — Derivar `km_override` no servidor (bug de auditoria do A7)** *(concluído em 2026-06-26 — deployado, testado e commitado)*
+  No caminho de correção (A7), `km_override` chegava como **booleano do corpo** (schemas
+  `correcaoChecklist`/`correcaoBDV`/`correcaoParada`): um vistoriador podia **baixar** um KM deixando a
+  flag em `false`, gravando `km_override=0` **sem `motivo`** e omitindo o evento §6.4 da trilha.
+  - **Correção:** `correcao.service::aplicarCorrecao` agora **deriva** a flag do diff via helper puro
+    `deriveKmOverride(entidade, row, changed)` — override = valor **novo < valor antigo** em qualquer
+    campo de KM alterado (`KM_FIELDS`). O booleano do corpo é descartado; `motivo` passa a ser exigido
+    sempre que a flag derivada for `true` (segunda barreira além do Zod, espelha `corrigirKmVeiculo`).
+  - **Harness local:** `backend/scripts/test-km-override.js` (sem DB, 14 casos) cobre redução/aumento/
+    igual, os 3 campos de KM (checklist/bdv/parada), KM antigo NULL e coerção de string.
+  - **Testado no servidor (vistoriador→admin, curl):** reduzir `km_entrada` sem motivo → **400**; com
+    motivo → **200** + auditoria `km_override=1` (corpo dizia `false`); aumentar KM → **200** +
+    `km_override=0`. Mesmo comportamento confirmado em `bdv.km_final`. Dados de teste restaurados.
 
 ---
 

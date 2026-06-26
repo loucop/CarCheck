@@ -16,6 +16,23 @@ const KM_FIELDS = {
     bdv_parada: ['km']
 };
 
+// A13 — deriva km_override no servidor a partir do diff, em vez de confiar no
+// booleano do corpo (que o vistoriador poderia deixar em `false` ao baixar um KM,
+// omitindo o evento de auditoria §6.4). Monotonicidade quebrada = o valor NOVO de
+// qualquer campo de KM alterado é estritamente menor que o valor ANTIGO que ele
+// substitui. `changed` já contém só os campos que mudaram (diff). Função pura:
+// sem DB, testável no harness. row[k] NULL → Number(null)=0, e KM é nonnegative,
+// então preencher um KM antes vazio nunca conta como redução.
+function deriveKmOverride(entidade, row, changed) {
+    const kmFields = KM_FIELDS[entidade] || [];
+    return kmFields.some((k) => {
+        if (!(k in changed)) return false;
+        const antigo = Number(row[k]);
+        const novo = Number(changed[k]);
+        return Number.isFinite(antigo) && Number.isFinite(novo) && novo < antigo;
+    });
+}
+
 // Snapshot textual p/ a auditoria (e p/ comparar antigo vs. novo). A mesma coluna
 // audita número, enum, boolean e JSON — guardamos o literal serializado.
 function valorToText(v) {
@@ -39,7 +56,8 @@ function normalizeForStore(campo, valor) {
 // aplica o update e grava a auditoria — tudo na transação aberta pelo chamador.
 // Se o INSERT de auditoria falhar, o chamador faz rollback (sem edição silenciosa).
 async function aplicarCorrecao(conn, ctx) {
-    const { entidade, entidade_id, row, veiculo_id, coligada, campos, motivo, km_override, matricula, updateFn } = ctx;
+    // km_override do corpo NÃO entra aqui: é derivado no servidor (A13).
+    const { entidade, entidade_id, row, veiculo_id, coligada, campos, motivo, matricula, updateFn } = ctx;
 
     const allowed = CORRECTABLE_FIELDS[entidade];
 
@@ -70,6 +88,18 @@ async function aplicarCorrecao(conn, ctx) {
     if (diff.length === 0) {
         throw {
             message: 'Nenhuma alteração detectada nos campos informados',
+            code: ERROR_CODES.VALIDATION_ERROR,
+            statusCode: 400
+        };
+    }
+
+    // A13 — flag à prova de adulteração: derivada do diff, nunca do corpo. Exige
+    // motivo sempre que for true (§6.3); segunda barreira além do Zod, que só cobre
+    // o caso em que o cliente já manda a flag.
+    const km_override = deriveKmOverride(entidade, row, changed);
+    if (km_override && (!motivo || motivo.trim().length === 0)) {
+        throw {
+            message: 'Motivo é obrigatório ao reduzir KM (override de monotonicidade)',
             code: ERROR_CODES.VALIDATION_ERROR,
             statusCode: 400
         };
@@ -108,7 +138,9 @@ async function aplicarCorrecao(conn, ctx) {
 
 const correcaoService = {
     async corrigirChecklist(conn, id, payload, user) {
-        const { motivo, km_override, ...campos } = payload;
+        // km_override é separado do payload só para não virar "campo"; o valor do
+        // corpo é descartado — a flag é derivada no servidor (A13).
+        const { motivo, km_override: _ignoraFlagDoCorpo, ...campos } = payload;
 
         // Fail-fast 404 fora da transação (mesmo padrão de closeBDV).
         const row = await correcaoRepository.findChecklistById(conn, id);
@@ -130,7 +162,6 @@ const correcaoService = {
                 coligada: user.coligada ?? null,
                 campos,
                 motivo,
-                km_override,
                 matricula: user.matricula,
                 updateFn: (c, changed) => correcaoRepository.updateChecklist(c, id, changed)
             });
@@ -143,7 +174,7 @@ const correcaoService = {
     },
 
     async corrigirBDV(conn, id, payload, user) {
-        const { motivo, km_override, ...campos } = payload;
+        const { motivo, km_override: _ignoraFlagDoCorpo, ...campos } = payload;
 
         const row = await correcaoRepository.findBdvById(conn, id);
         if (!row) {
@@ -164,7 +195,6 @@ const correcaoService = {
                 coligada: user.coligada ?? null,
                 campos,
                 motivo,
-                km_override,
                 matricula: user.matricula,
                 updateFn: (c, changed) => correcaoRepository.updateBdv(c, id, changed)
             });
@@ -242,7 +272,7 @@ const correcaoService = {
     },
 
     async corrigirParada(conn, bdv_id, parada_id, payload, user) {
-        const { motivo, km_override, ...campos } = payload;
+        const { motivo, km_override: _ignoraFlagDoCorpo, ...campos } = payload;
 
         const row = await correcaoRepository.findParadaById(conn, bdv_id, parada_id);
         if (!row) {
@@ -263,7 +293,6 @@ const correcaoService = {
                 coligada: user.coligada ?? null,
                 campos,
                 motivo,
-                km_override,
                 matricula: user.matricula,
                 updateFn: (c, changed) => correcaoRepository.updateParada(c, bdv_id, parada_id, changed)
             });
@@ -277,3 +306,5 @@ const correcaoService = {
 };
 
 module.exports = correcaoService;
+// Exposto p/ o harness local de A13 (teste puro, sem DB) — ver scripts/test-km-override.js.
+module.exports.deriveKmOverride = deriveKmOverride;

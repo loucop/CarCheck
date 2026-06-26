@@ -28,7 +28,6 @@
 | A8 | Front | 🟠 | 🔵 | Ordem dos guards em `bdv.html` (pendente verificação) |
 | A11 | Back+DB | 🟠 | ⬜ | Tirar base64 das queries de lista (+ endpoint de detalhe) |
 | A12 | DB | 🟠 | ⬜ | Índices em queries quentes (confirmar no banco vivo) |
-| A13 | Back | 🟠 | ⬜ | Derivar `km_override` no servidor (bug de auditoria do A7) |
 | A14 | Back+LGPD | 🟠 | ⬜ | Remover CPF do histórico + logger com níveis |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
@@ -93,8 +92,9 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     > ⏸ **Deferido — pendente clarificação de fluxo operacional com o setor de logística:**
     > (a) o vistoriador reutiliza o `checklist.html` existente ou precisa de um formulário de inspeção
     > pós-retorno separado? (b) qual é o fluxo diário completo do vistoriador, do início ao fim?
-  - ⚠️ Bugs/itens correlatos **ainda pendentes** no backend já entregue: **A13** (flag `km_override`
-    auto-reportada pelo cliente) e **M11** (drift da âncora de KM). Liga-se a A6 (role-aware), A3, M6.
+  - ⚠️ Bug correlato **ainda pendente** no backend já entregue: **M11** (drift da âncora de KM).
+    Liga-se a A6 (role-aware), A3, M6. (**A13** — flag `km_override` derivada no servidor — concluído,
+    ver `BACKLOG_DONE.md`.)
 
 - 🔵 **A8 — `bdv.html`: guard de veículo roda antes da checagem de viagem ativa** *(corrigido, pendente verificação no servidor)*
   Um motorista **em viagem** com `localStorage.veiculo_id` vazio é mandado para `selecao.html` **antes**
@@ -150,18 +150,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     GROUP BY TABLE_NAME, INDEX_NAME;
     ```
 
-- ⬜ **A13 — Flag `km_override` é auto-reportada pelo cliente (bypass de auditoria)** *(achado na auditoria 2026-06-24)*
-  No caminho de correção (A7), `km_override` é um **booleano vindo do corpo** (schemas
-  `correcaoChecklist`/`correcaoBDV`/`correcaoParada`, default `false`). O `correcao.service` **não tem
-  guard monotônico por design** e **nunca** compara o KM novo contra `veiculos.km_atual`. Logo, um
-  vistoriador pode baixar um `km_entrada` abaixo da âncora e, deixando a flag em `false`, gravar
-  `km_override=0` **sem `motivo` obrigatório** (motivo só é exigido quando a flag é `true`).
-  - Isso **fura o objetivo §6.4**: "o vistoriador quebrou a monotonicidade de propósito" deveria ser um
-    evento de primeira classe filtrável; do jeito atual o evento pode ser silenciosamente omitido.
-  - **Correção:** **derivar** `km_override` no servidor (em `aplicarCorrecao`), comparando o valor novo
-    com a restrição monotônica (âncora do veículo / registros vizinhos), em vez de confiar no booleano —
-    e exigir `motivo` sempre que a flag derivada for `true`. Torna a trilha à prova de adulteração pelos
-    próprios operadores, que é o ponto da auditoria append-only.
 
 - ⬜ **A14 — Exposição de CPF / PII (LGPD)** *(achado na auditoria 2026-06-24)*
   - `GET /veiculos/:id/historico` retorna `motorista_cpf` de **toda** inspeção do veículo a **qualquer
