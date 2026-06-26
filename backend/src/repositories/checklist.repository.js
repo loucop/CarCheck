@@ -20,6 +20,8 @@ const checklistRepository = {
     // A11: NÃO seleciona mapa_avaria_base64 — o histórico só renderiza
     // data/motorista/KM/rota; a imagem (LONGTEXT, até 500 KB) viajava sem uso.
     // O detalhe da imagem é servido sob demanda por findMapaById (GET /checklist/:id/mapa).
+    // A14: também NÃO retorna CPF (PII/LGPD) — este endpoint é aberto a qualquer
+    // usuário autenticado e o CPF não é renderizado; reservado a visões admin-scoped.
     async findHistoricoByVeiculo(conn, veiculoId, limit, offset) {
         const query = `
             SELECT
@@ -29,8 +31,7 @@ const checklistRepository = {
                 c.local_destino,
                 c.data_inspecao,
                 c.itens_status,
-                f.nome as motorista,
-                f.cpf as motorista_cpf
+                f.nome as motorista
             FROM checklists c
             LEFT JOIN funcionarios f ON f.matricula = c.matricula
             WHERE c.veiculo_id = ?
@@ -84,6 +85,8 @@ const checklistRepository = {
     // relatório (default 100), inflando o payload em MB e segurando uma conexão do
     // pool pela transferência inteira. A imagem é buscada por linha, sob demanda,
     // via findMapaById quando o admin abre o detalhe.
+    // A14: também NÃO retorna CPF (PII/LGPD) — não é renderizado no relatório e o
+    // A7 expôs esta rota ao vistoriador; CPF fica restrito à gestão de funcionários.
     async findRelatorio(conn, funcionarioMatricula, limit, offset) {
         let query = `
             SELECT
@@ -92,7 +95,6 @@ const checklistRepository = {
                 v.placa,
                 v.modelo,
                 f.nome as motorista,
-                f.cpf as motorista_cpf,
                 f.matricula as motorista_matricula,
                 c.km_entrada,
                 c.local_origem,

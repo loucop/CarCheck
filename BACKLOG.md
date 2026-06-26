@@ -27,7 +27,7 @@
 | A7 | Front | 🟠 | 🔵 | UI de correção do vistoriador (slice 4; backend pronto) |
 | A8 | Front | 🟠 | 🔵 | Ordem dos guards em `bdv.html` (pendente verificação) |
 | A12 | DB | 🟠 | ⬜ | Índices em queries quentes (confirmar no banco vivo) |
-| A14 | Back+LGPD | 🟠 | ⬜ | Remover CPF do histórico + logger com níveis |
+| A14 | Back+LGPD | 🟠 | ⬜ | Logger com níveis (PII nos logs) — CPF do histórico ✅ |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
@@ -137,17 +137,11 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     ```
 
 
-- ⬜ **A14 — Exposição de CPF / PII (LGPD)** *(achado na auditoria 2026-06-24)*
-  - `GET /veiculos/:id/historico` retorna `motorista_cpf` de **toda** inspeção do veículo a **qualquer
-    usuário autenticado** — qualquer motorista lê o **CPF** de outros motoristas (dado pessoal sensível
-    sob a LGPD) + os mapas de avaria. O **A3 #8** aceitou o IDOR de *histórico de frota* como
-    "single-tenant por design", mas não pesou o ângulo **CPF/LGPD**. **Correção:** remover
-    `motorista_cpf` do payload de histórico (não é necessário para renderizar) e reservar CPF a visões
-    admin-scoped. Vale também agora que o A7 expôs os relatórios admin ao vistoriador — decisão
-    consciente sobre supervisor ver CPF de todos.
-  - **Logs com PII:** `checklist.service` e `veiculo.repository.updateKm` fazem `console.log` de
-    matrícula/KM/tamanho do base64 em **toda** escrita, **sem gate de env** — PII + ruído de alto volume
-    em produção (LGPD + log-bloat). Estende o **B1**; passar tudo por um logger com níveis.
+- ⬜ **A14 (logger) — Logs com PII sem gate de ambiente** *(achado na auditoria 2026-06-24)*
+  Fatia de CPF **concluída** (removido `motorista_cpf` dos payloads de relatório/histórico — ver
+  `BACKLOG_DONE.md`). Resta: `checklist.service` e `veiculo.repository.updateKm` fazem `console.log` de
+  matrícula/KM/tamanho do base64 em **toda** escrita, **sem gate de env** — PII + ruído de alto volume
+  em produção (LGPD + log-bloat). Estende o **B1**; passar tudo por um logger com níveis.
 
 ---
 

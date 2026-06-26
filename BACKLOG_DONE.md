@@ -379,6 +379,17 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
   - **Fase 2 (diferida):** mover as imagens para fora da linha (object storage R2/S3) — rastreada no
     `BACKLOG.md` ativo, pareia com **B14**.
 
+- ✅ **A14 (fatia CPF) — Remover `motorista_cpf` dos payloads de relatório/histórico (LGPD)** *(concluído em 2026-06-26 — deployado, testado e commitado)*
+  `GET /veiculos/:id/historico` (aberto a **qualquer** autenticado) e `GET /admin/relatorio` (exposto ao
+  vistoriador pelo A7) retornavam `motorista_cpf` de toda inspeção — qualquer um lia o CPF de outros
+  motoristas (PII/LGPD), sem que o frontend sequer renderizasse o campo.
+  - **Correção:** removido `f.cpf as motorista_cpf` de `findRelatorio` e `findHistoricoByVeiculo`
+    (`checklist.repository`). Nenhuma mudança de frontend — nada consumia `motorista_cpf`. CPF segue
+    disponível só na gestão de funcionários (`/admin/funcionarios`, admin-scoped).
+  - **Testado no servidor (admin, curl):** ambos os endpoints retornam **0** ocorrências de
+    `motorista_cpf`, mantendo `motorista` (nome) e `motorista_matricula`.
+  - **Resta da A14 (diferido):** logs com PII sem gate de env → logger com níveis (no `BACKLOG.md`, com **B1**).
+
 ---
 
 ## 🟡 Médio — concluído
