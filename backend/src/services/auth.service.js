@@ -3,6 +3,11 @@ const jwt = require('jsonwebtoken');
 const funcionarioRepository = require('../repositories/funcionario.repository');
 const { ERROR_CODES } = require('../utils/constants');
 
+// Hash bcrypt descartável (cost 10, igual aos hashes reais) usado para igualar o
+// tempo de resposta no caminho "usuário inexistente" — evita enumeração de
+// matrícula/CPF por timing (M13). Computado uma vez na carga do módulo.
+const DUMMY_HASH = bcrypt.hashSync('timing-equalization-dummy', 10);
+
 const authService = {
     /**
      * Realizar login
@@ -12,8 +17,11 @@ const authService = {
         const funcionario = await funcionarioRepository.findByMatriculaOrCPF(conn, matricula);
         
         if (!funcionario) {
-            throw { 
-                message: 'Usuário ou senha inválidos', 
+            // Iguala o tempo de resposta ao do caminho "senha errada" (bcrypt ~100ms),
+            // para que um usuário inexistente não retorne mais rápido (M13).
+            await bcrypt.compare(senha, DUMMY_HASH);
+            throw {
+                message: 'Usuário ou senha inválidos',
                 code: ERROR_CODES.AUTH_FAILED,
                 statusCode: 401
             };

@@ -423,6 +423,25 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
+- ✅ **M13 — Enumeração de usuário por timing no login** *(concluído em 2026-06-30; verificado no servidor vivo)*
+  `authService.login` retornava **imediatamente** no caminho "usuário inexistente", enquanto um usuário
+  real pagava ~100ms de `bcrypt.compare` — a diferença permitia enumerar `matricula`/`CPF` válidos por
+  tempo de resposta.
+  - **Correção (`auth.service.js`):** `DUMMY_HASH = bcrypt.hashSync('timing-equalization-dummy', 10)`
+    computado uma vez na carga do módulo (cost 10, igual aos hashes reais de `createFuncionario`/script de
+    migração). No `if (!funcionario)`, roda um `await bcrypt.compare(senha, DUMMY_HASH)` descartável antes
+    de lançar o 401, igualando o tempo ao do caminho "senha errada".
+  - **Verificado (curl, 10.10.1.100:3000):** matrícula inexistente vs. matrícula real + senha errada agora
+    ficam na mesma faixa (~0,227s vs. ~0,233s, diferença dentro do jitter de rede); antes o inexistente
+    voltava quase instantâneo. Teste auto-reseta a janela do rate limiter via login bem-sucedido entre as
+    medições.
+  - **Caveat (fora do escopo, registrado):** senhas **legadas em texto plano** ainda comparam com `===`
+    (instantâneo) — um usuário plaintext com senha errada continua distinguível por timing. O fix correto é
+    concluir a migração para bcrypt (`scripts/migrate-passwords.js`), não adicionar atraso artificial. O
+    admin (matrícula 3) já é bcrypt — confirmado pela faixa de ~0,23s no teste.
+  - **Pendências relacionadas:** lockout por conta no deploy público segue em aberto (pesar contra
+    DoS-por-lockout); o rate limiter por IP (M2) ajuda mas é compartilhado por NAT e reseta no restart.
+
 - ✅ **M3 — Vazamento de detalhes em erros 500** *(concluído em 2026-06-10)*
   Branch genérico (500 inesperado) em `errorHandler.middleware.js` agora retorna mensagem
   genérica quando `NODE_ENV === 'production'`, expondo `err.message` apenas em dev. Branches de

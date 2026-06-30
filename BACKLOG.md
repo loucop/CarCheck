@@ -35,7 +35,6 @@
 | M10 | Back | 🟡 | ⬜ | TOCTOU em `closeBDV`/paradas (re-lock na transação) |
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
 | M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
-| M13 | Back | 🟡 | ⬜ | Enumeração de usuário por timing no login |
 | M14 | Front | 🟡 | ⬜ | Resiliência móvel (timeout + guard de double-submit) |
 | M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
 | B1 | Front+Back | 🟢 | ⬜ | Remover `console.log` de debug (PII no console) |
@@ -212,13 +211,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     não tem índice único filtrado, mas dá para garantir com uma tabela pequena `bdv_ativos`
     (`unique(veiculo_id)`, `unique(matricula)`) escrita na mesma transação. Hoje a serialização por
     `FOR UPDATE` é adequada; revisitar se surgir um segundo caminho de escrita.
-
-- ⬜ **M13 — Enumeração de usuário por timing no login** *(achado na auditoria 2026-06-24)*
-  `authService.login` retorna **imediatamente** quando o usuário não existe, mas roda `bcrypt.compare`
-  (~100 ms) quando existe. Essa diferença de tempo permite enumerar `matricula`/`CPF` válidos — e CPF é
-  enumerável. O limiter por IP ajuda, mas é compartilhado por NAT e reseta no restart (M2).
-  - **Correção:** equalizar o tempo com um `bcrypt.compare` dummy no caminho "não encontrado". Considerar
-    lockout por conta no deploy público (pesando contra DoS-por-lockout).
 
 - ⬜ **M14 — Resiliência de conexão em rede móvel (timeout + feedback + guard de double-submit)** *(auditoria mobile 2026-06-24)*
   O produto é usado por motoristas em campo, em celular, com cobertura instável — mas o cliente assume
@@ -472,4 +464,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M13, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
