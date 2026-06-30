@@ -1,3 +1,5 @@
+const logger = require('../utils/logger');
+
 const veiculoRepository = {
     async findAllActive(conn) {
         const query = `
@@ -41,14 +43,14 @@ const veiculoRepository = {
     },
 
     async updateKm(conn, veiculoId, novoKm) {
-        console.log('[VEICULO REPO] updateKm | veiculoId:', veiculoId, '| novoKm:', novoKm);
+        logger.debug('[VEICULO REPO] updateKm | veiculoId:', veiculoId, '| novoKm:', novoKm);
         const query = `
             UPDATE veiculos 
             SET km_atual = ? 
             WHERE id = ?
         `;
         const result = await conn.query(query, [novoKm, veiculoId]);
-        console.log('[VEICULO REPO] updateKm result:', result);
+        logger.debug('[VEICULO REPO] updateKm result:', result);
         return result;
     }
 };

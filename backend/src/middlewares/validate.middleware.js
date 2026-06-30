@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const response = require('../utils/response');
 const { ERROR_CODES } = require('../utils/constants');
+const logger = require('../utils/logger');
 
 const validate = (schema, source = 'body') => {
     return (req, res, next) => {
@@ -15,7 +16,7 @@ const validate = (schema, source = 'body') => {
                     message: e.message
                 }));
 
-                console.error('[VALIDATION ERROR]', JSON.stringify(errors));
+                logger.warn('[VALIDATION ERROR]', JSON.stringify(errors));
 
                 return res.status(400).json({
                     success: false,

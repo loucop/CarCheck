@@ -1,5 +1,6 @@
 const mariadb = require('mariadb');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
 // Configuração do pool
 const pool = mariadb.createPool({
@@ -16,11 +17,11 @@ const pool = mariadb.createPool({
 // Health check na inicialização
 pool.getConnection()
     .then(conn => {
-        console.log('[DB] Conexão estabelecida com MariaDB');
+        logger.info('[DB] Conexão estabelecida com MariaDB');
         conn.release();
     })
     .catch(err => {
-        console.error('[DB FATAL] Falha ao conectar:', err.message);
+        logger.error('[DB FATAL] Falha ao conectar:', err.message);
         process.exit(1);
     });
 

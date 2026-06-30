@@ -10,6 +10,7 @@ const routes = require('./src/routes');
 const { corsOrigins } = require('./src/config/cors');
 const { csrfProtection } = require('./src/middlewares/csrf.middleware');
 const { errorHandler, notFoundHandler } = require('./src/middlewares/errorHandler.middleware');
+const logger = require('./src/utils/logger');
 
 const app = express();
 
@@ -196,7 +197,7 @@ const WEAK_DEFAULTS = [
 ];
 
 if (!JWT_SECRET || WEAK_DEFAULTS.includes(JWT_SECRET) || JWT_SECRET.length < 32) {
-    console.error('FATAL: JWT_SECRET is missing, weak, or default. Set a strong secret in .env before starting.');
+    logger.error('FATAL: JWT_SECRET is missing, weak, or default. Set a strong secret in .env before starting.');
     process.exit(1);
 }
 
@@ -204,15 +205,18 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
-    console.log('\n' + '='.repeat(60));
-    console.log('  CarCheck Backend v4.0 - ENTERPRISE EDITION');
-    console.log('='.repeat(60));
-    console.log(`  Endereço:  http://10.10.1.100:${PORT}`);
-    console.log(`  Ambiente:  ${process.env.NODE_ENV || 'production'}`);
-    console.log(`  Banco:     MariaDB (carcheck_db)`);
-    console.log(`  Status:    🟢 ONLINE`);
-    console.log('  Features:  JWT Auth | Transações | Validação Zod');
-    console.log('='.repeat(60) + '\n');
+    const sep = '='.repeat(60);
+    logger.info(
+        '\n' + sep +
+        '\n  CarCheck Backend v4.0 - ENTERPRISE EDITION' +
+        '\n' + sep +
+        `\n  Endereço:  http://10.10.1.100:${PORT}` +
+        `\n  Ambiente:  ${process.env.NODE_ENV || 'production'}` +
+        '\n  Banco:     MariaDB (carcheck_db)' +
+        '\n  Status:    🟢 ONLINE' +
+        '\n  Features:  JWT Auth | Transações | Validação Zod' +
+        '\n' + sep + '\n'
+    );
 });
 
 // ==========================================
@@ -220,20 +224,20 @@ app.listen(PORT, HOST, () => {
 // ==========================================
 
 process.on('SIGTERM', () => {
-    console.log('[SHUTDOWN] Encerrando servidor...');
+    logger.info('[SHUTDOWN] Encerrando servidor...');
     process.exit(0);
 });
 
 process.on('SIGINT', () => {
-    console.log('[SHUTDOWN] Encerrando servidor...');
+    logger.info('[SHUTDOWN] Encerrando servidor...');
     process.exit(0);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('[ERRO NÃO TRATADO]', { reason, promise });
+    logger.error('[ERRO NÃO TRATADO]', { reason, promise });
 });
 
 process.on('uncaughtException', (error) => {
-    console.error('[EXCEÇÃO NÃO CAPTURADA]', error);
+    logger.error('[EXCEÇÃO NÃO CAPTURADA]', error);
     process.exit(1);
 });

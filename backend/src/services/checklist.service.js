@@ -1,13 +1,14 @@
 const checklistRepository = require('../repositories/checklist.repository');
 const veiculoRepository = require('../repositories/veiculo.repository');
 const { ERROR_CODES } = require('../utils/constants');
+const logger = require('../utils/logger');
 
 const checklistService = {
     async createChecklist(conn, data) {
         try {
             await conn.beginTransaction();
 
-            console.log('[SERVICE] Iniciando checklist | veiculo_id:', data.veiculo_id, '| matricula:', data.matricula, '| km:', data.km_entrada);
+            logger.debug('[SERVICE] Iniciando checklist | veiculo_id:', data.veiculo_id, '| matricula:', data.matricula, '| km:', data.km_entrada);
 
             // 1. Lock no veículo
             const veiculo = await veiculoRepository.findByIdWithLock(conn, data.veiculo_id);
@@ -54,9 +55,9 @@ const checklistService = {
                 const cleaned = data.mapa_avaria_base64.replace(/\s/g, '');
                 if (cleaned.startsWith('data:image/')) {
                     base64Final = cleaned;
-                    console.log('[SERVICE] Base64 aceito, tamanho:', base64Final.length);
+                    logger.debug('[SERVICE] Base64 aceito, tamanho:', base64Final.length);
                 } else {
-                    console.warn('[SERVICE] Base64 inválido, descartado');
+                    logger.warn('[SERVICE] Base64 inválido, descartado');
                 }
             }
 
@@ -71,13 +72,13 @@ const checklistService = {
                 mapa_avaria_base64: base64Final
             });
 
-            console.log('[SERVICE] Checklist inserido, ID:', checklistId);
+            logger.debug('[SERVICE] Checklist inserido, ID:', checklistId);
 
             // 6. Atualizar KM do veículo
             await veiculoRepository.updateKm(conn, data.veiculo_id, data.km_entrada);
 
             await conn.commit();
-            console.log('[SERVICE] Commit OK');
+            logger.debug('[SERVICE] Commit OK');
 
             return {
                 id: checklistId,
@@ -87,7 +88,7 @@ const checklistService = {
 
         } catch (err) {
             await conn.rollback();
-            console.error('[SERVICE] Rollback executado. Erro:', err.message || err);
+            logger.error('[SERVICE] Rollback executado. Erro:', err.message || err);
             throw err;
         }
     },

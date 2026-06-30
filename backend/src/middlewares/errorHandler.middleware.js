@@ -1,4 +1,5 @@
 const { ERROR_CODES } = require('../utils/constants');
+const logger = require('../utils/logger');
 
 /**
  * Error handler global
@@ -20,7 +21,7 @@ const errorHandler = (err, req, res, next) => {
         user: req.user?.matricula || 'anonymous'
     };
     
-    console.error('[ERROR]', JSON.stringify(errorLog));
+    logger.error('[ERROR]', JSON.stringify(errorLog));
 
     // Erros de banco MariaDB
     if (err.code === 'ER_DUP_ENTRY') {
