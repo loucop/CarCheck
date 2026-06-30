@@ -41,7 +41,6 @@
 | B1 | Front+Back | 🟢 | ⬜ | Remover `console.log` de debug (PII no console) |
 | B2 | Back | 🟢 | ⬜ | Política de senha mais forte |
 | B3 | Back | 🟢 | ⬜ | Limite de payload (rever se ainda distinto vs A4) |
-| B4 | Back+DB | 🟢 | ⬜ | Query não-sargável no guard diário (sargável + anti-join) |
 | B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
 | B7 | Front | 🟢 | 🔵 | XSS nas telas do motorista (2 fixes: frota.js, bdv.html) |
 | M1-b | Front | 🟢 | ⬜ | Handlers inline `on*=` → `addEventListener` (sub-M1) |
@@ -267,20 +266,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   Avaliar reduzir o limite global e isolar o upload pesado em rota dedicada (superfície de DoS).
   *(Nota: o A4-H2 já trocou o `50mb` global por `100kb` default + `1mb` só no checklist — confirmar se
   este item ainda é distinto ou pode ser fechado contra o A4.)*
-
-- ⬜ **B4 — Query não-sargável no guard diário** *(escopo ampliado na auditoria 2026-06-24)*
-  `findPendingTodayByMatricula` combina **dois** problemas de escala e roda nos dois caminhos de escrita
-  mais frequentes (todo submit de checklist & abertura de BDV):
-  - `DATE(data_inspecao) = CURDATE()` derrota qualquer índice em `data_inspecao`.
-  - `id NOT IN (SELECT checklist_id FROM bdv WHERE checklist_id IS NOT NULL)` faz um subquery que
-    varre `bdv` crescendo para sempre.
-  Reescrever sargável + anti-join (faz par com o índice `(matricula, data_inspecao)` do **A12**):
-  ```sql
-  WHERE c.matricula = ?
-    AND c.data_inspecao >= CURDATE() AND c.data_inspecao < CURDATE() + INTERVAL 1 DAY
-    AND NOT EXISTS (SELECT 1 FROM bdv b WHERE b.checklist_id = c.id)
-  ```
-  Fazer **antes** das tabelas crescerem, não depois.
 
 - ⬜ **B5 — Sem testes automatizados**
   Projeto não possui testes (decisão atual). Caso evolua, priorizar testes dos serviços

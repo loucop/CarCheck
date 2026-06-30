@@ -523,6 +523,19 @@ removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN).
 
 ## 🟢 Baixo — concluído
 
+- ✅ **B4 — Query não-sargável no guard diário (sargável + anti-join)** *(concluído em 2026-06-30 — deployado, testado por curl e commitado `dbefece`)*
+  `findPendingTodayByMatricula` (roda em **todo** submit de checklist & abertura de BDV) e seu irmão
+  A6 `findPendingDetailTodayByMatricula` combinavam dois problemas de escala: `DATE(data_inspecao) =
+  CURDATE()` (derrota índice) + `id NOT IN (subquery)` que varre `bdv` crescendo.
+  - **Correção:** reescritos para range sargável (`data_inspecao >= CURDATE() AND < CURDATE() + INTERVAL
+    1 DAY`) + `NOT EXISTS (SELECT 1 FROM bdv b WHERE b.checklist_id = c.id)`. `NOT EXISTS` é imune ao trap
+    de NULL do `NOT IN`, então o antigo `WHERE checklist_id IS NOT NULL` foi dispensado. Pareia com o
+    índice `(matricula, data_inspecao)` do **A12** (ainda pendente). Sem mudança de comportamento.
+  - **Testado no servidor (curl):** vistoriador com checklist pendente do dia (id 54, sem BDV vinculado)
+    → re-submit retorna **409 `DUPLICATE_ENTRY`** (guard detecta o órfão pela query reescrita), rejeitado
+    antes do INSERT. A direção de exclusão (checklist já vinculado não bloqueia) é transform idêntico ao
+    `NOT IN` que rodava em prod — confirmada por inspeção (predicado de anti-join padrão).
+
 - ✅ **B6 — Housekeeping do repositório** *(resolvido 2026-06-19)*
   Remover arquivos vazios soltos no working dir (`git`, `main`) e decidir sobre `LICENSE` (untracked).
   > **✅ Resolvido (2026-06-19):** os arquivos vazios `git`/`main` não existem mais; `LICENSE` foi
