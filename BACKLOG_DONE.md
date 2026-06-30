@@ -27,6 +27,18 @@
 
 ## 🟠 Alto — concluído
 
+- ✅ **A8 — `bdv.html`: ordem dos guards (viagem ativa antes do guard de veículo)** *(fix em 2026-06-17; deployado e verificado em browser 2026-06-30)*
+  Um motorista **em viagem** com `localStorage.veiculo_id` vazio era mandado para `selecao.html` **antes**
+  de `/bdv/ativo` ser checado → não conseguia chegar à própria viagem ativa.
+  - **Correção:** `verificarBDVAtivo()` virou o ponto de decisão no `DOMContentLoaded` (`await`ado).
+    200 (viagem ativa) → renderiza `andamento` e retorna **sem** exigir `veiculo_id`; o guard de veículo
+    foi extraído para `exigirVeiculoParaNovaViagem()`, que roda **só** nos caminhos de nova viagem
+    ('abrir', não-200). Hidratação de órfão (A6) permanece antes da checagem. Frontend-only (`bdv.html`).
+  - **Verificado em browser (2026-06-30):** logar como motorista → abrir BDV → apagar `veiculo_id` do
+    localStorage → recarregar `bdv.html` → permanece na viagem ativa (antes: bounce para `selecao.html`).
+    Não é curl-testável (lógica de ordenação client-side); retestado manualmente pelo usuário.
+  - Separado do **A6** (recuperação de órfão): aqui o BDV **existe e está aberto** — era só a ordem dos guards.
+
 - ✅ **A1 — Auditar XSS em todas as páginas admin** *(concluído em 2026-06-10)*
   Auditadas todas as páginas admin. 6 lacunas corrigidas — destaque para o vetor **alto**:
   `mapa_avaria_base64` (controlado pelo motorista) era inserido sem escape no `src` de `<img>`

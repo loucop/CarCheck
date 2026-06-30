@@ -25,7 +25,6 @@
 | ID | Domínio | Pri | St | Resumo |
 |------|-----------|----|----|--------|
 | A7 | Front | 🟠 | 🔵 | UI de correção do vistoriador (slice 4; backend pronto) |
-| A8 | Front | 🟠 | 🔵 | Ordem dos guards em `bdv.html` (pendente verificação) |
 | A12 | DB | 🟠 | ⬜ | Índices em queries quentes (confirmar no banco vivo) |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
@@ -93,18 +92,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   - ⚠️ Bug correlato **ainda pendente** no backend já entregue: **M11** (drift da âncora de KM).
     Liga-se a A6 (role-aware), A3, M6. (**A13** — flag `km_override` derivada no servidor — concluído,
     ver `BACKLOG_DONE.md`.)
-
-- 🔵 **A8 — `bdv.html`: guard de veículo roda antes da checagem de viagem ativa** *(corrigido, pendente verificação no servidor)*
-  Um motorista **em viagem** com `localStorage.veiculo_id` vazio é mandado para `selecao.html` **antes**
-  de `/bdv/ativo` ser checado → não consegue chegar à sua viagem ativa.
-  > **Fix implementado (2026-06-17), pendente deploy (arquivos estáticos) + reteste:** `verificarBDVAtivo()`
-  > virou o ponto de decisão no `DOMContentLoaded` (`await`ado); 200 (viagem ativa) → `andamento` **sem**
-  > exigir `veiculo_id`; guard de veículo extraído para `exigirVeiculoParaNovaViagem()`, roda **antes** de
-  > qualquer saída para o estado 'abrir'. Hidratação de órfão (A6) permanece antes da checagem.
-  - **Repro:** abrir um BDV, limpar o `localStorage`, navegar para `bdv.html` → era jogado para
-    `selecao.html` em vez da viagem ativa.
-  - Separado do **A6** (recuperação de órfão): aqui o BDV **existe e está aberto** — é a ordem dos guards
-    que impede chegar até ele.
 
 - ⬜ **A11 fase 2 — Externalizar imagens para fora da linha (object storage)** *(diferida; fase 1 concluída — ver `BACKLOG_DONE.md`)*
   A fase 1 (não trafegar `mapa_avaria_base64` em listas + endpoint de detalhe sob demanda) está
