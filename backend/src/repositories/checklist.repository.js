@@ -47,13 +47,19 @@ const checklistRepository = {
         return rows[0].total;
     },
 
+    // B4: query do guard diário — roda em TODO submit de checklist e abertura de BDV.
+    // Reescrita sargável: range em data_inspecao (em vez de DATE(...) = CURDATE(), que
+    // derrota o índice (matricula, data_inspecao) do A12) + NOT EXISTS anti-join (em vez
+    // de NOT IN(subquery), que varre bdv inteiro). NOT EXISTS é imune ao trap de NULL do
+    // NOT IN, então dispensa o antigo `WHERE checklist_id IS NOT NULL`.
     async findPendingTodayByMatricula(conn, matricula) {
         const query = `
-            SELECT id, veiculo_id FROM checklists
-            WHERE matricula = ?
-              AND DATE(data_inspecao) = CURDATE()
-              AND id NOT IN (SELECT checklist_id FROM bdv WHERE checklist_id IS NOT NULL)
-            ORDER BY id DESC LIMIT 1
+            SELECT c.id, c.veiculo_id FROM checklists c
+            WHERE c.matricula = ?
+              AND c.data_inspecao >= CURDATE()
+              AND c.data_inspecao < CURDATE() + INTERVAL 1 DAY
+              AND NOT EXISTS (SELECT 1 FROM bdv b WHERE b.checklist_id = c.id)
+            ORDER BY c.id DESC LIMIT 1
         `;
         const rows = await conn.query(query, [matricula]);
         return rows.length > 0 ? rows[0] : null;
@@ -62,6 +68,7 @@ const checklistRepository = {
     // A6: mesmo critério de "órfão" do findPendingTodayByMatricula (checklist de
     // hoje, do motorista, ainda não vinculado a um BDV), mas com o contexto de
     // veículo que a recuperação precisa para abrir o BDV (veiculo_id + KM + placa/modelo).
+    // B4: mesma reescrita sargável + anti-join do guard acima.
     async findPendingDetailTodayByMatricula(conn, matricula) {
         const query = `
             SELECT
@@ -73,8 +80,9 @@ const checklistRepository = {
             FROM checklists c
             LEFT JOIN veiculos v ON v.id = c.veiculo_id
             WHERE c.matricula = ?
-              AND DATE(c.data_inspecao) = CURDATE()
-              AND c.id NOT IN (SELECT checklist_id FROM bdv WHERE checklist_id IS NOT NULL)
+              AND c.data_inspecao >= CURDATE()
+              AND c.data_inspecao < CURDATE() + INTERVAL 1 DAY
+              AND NOT EXISTS (SELECT 1 FROM bdv b WHERE b.checklist_id = c.id)
             ORDER BY c.id DESC LIMIT 1
         `;
         const rows = await conn.query(query, [matricula]);
