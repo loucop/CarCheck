@@ -379,7 +379,9 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
   - **Fase 2 (diferida):** mover as imagens para fora da linha (object storage R2/S3) — rastreada no
     `BACKLOG.md` ativo, pareia com **B14**.
 
-- ✅ **A14 (fatia CPF) — Remover `motorista_cpf` dos payloads de relatório/histórico (LGPD)** *(concluído em 2026-06-26 — deployado, testado e commitado)*
+- ✅ **A14 — Logs com PII sem gate de ambiente (LGPD)** *(item completo — fatia CPF em 2026-06-26; fatia logger em 2026-06-30, deployada/testada/commitada)*
+
+  **Fatia CPF** — Remover `motorista_cpf` dos payloads de relatório/histórico *(concluído em 2026-06-26 — deployado, testado e commitado)*
   `GET /veiculos/:id/historico` (aberto a **qualquer** autenticado) e `GET /admin/relatorio` (exposto ao
   vistoriador pelo A7) retornavam `motorista_cpf` de toda inspeção — qualquer um lia o CPF de outros
   motoristas (PII/LGPD), sem que o frontend sequer renderizasse o campo.
@@ -388,7 +390,22 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
     disponível só na gestão de funcionários (`/admin/funcionarios`, admin-scoped).
   - **Testado no servidor (admin, curl):** ambos os endpoints retornam **0** ocorrências de
     `motorista_cpf`, mantendo `motorista` (nome) e `motorista_matricula`.
-  - **Resta da A14 (diferido):** logs com PII sem gate de env → logger com níveis (no `BACKLOG.md`, com **B1**).
+  **Fatia logger** — Logger com níveis, gate de PII em `debug` *(concluído em 2026-06-30 — deployado, testado com submit real e commitado `d316bf8`)*
+  - `checklist.service` e `veiculo.repository.updateKm` faziam `console.log` de matrícula/KM/tamanho do
+    base64 em **toda** escrita, sem gate de env (PII + ruído de alto volume em produção).
+  - **Correção:** novo `src/utils/logger.js` — logger zero-dependência com níveis (`error`/`warn`/`info`/
+    `debug`), gated por `LOG_LEVEL`. Default `info` em produção (debug suprimido → **sem PII**), `debug`
+    fora de prod. error/warn → stderr, info/debug → stdout (combina com AppStdout/AppStderr do NSSM, B8).
+  - Todos os `console.*` do backend roteados pelo logger: os logs de PII viraram `logger.debug`
+    (silenciosos em prod); `checklist.service`, `veiculo.repository`, `validate.middleware`,
+    `errorHandler.middleware`, `database.js`, `index.js`. `LOG_LEVEL` documentado em `.env.example`.
+    **Sem nova dependência** (só copiar os `.js`; sem `npm ci`).
+  - **B1 segue aberto:** é só frontend (`admin.js`, `auth.js`, `checklist.js`, `frota.js`,
+    `pdf-engine.js`) — não tocado aqui; esta fatia foi backend-only.
+  - **Testado no servidor:** `/health`, login válido/inválido (400), e **submit real de checklist**
+    (vistoriador, veículo 2, `km_atual` 60000 → 60001, HTTP 201) — log do servidor **silencioso** para o
+    request (nenhuma linha de matrícula/KM), confirmando o gate de PII em prod.
+  - Os `console.*` de `scripts/` (CLIs rodados à mão) foram deixados como estão — fora do escopo do sink.
 
 ---
 
