@@ -164,9 +164,6 @@ function verDetalhes(id) {
         return;
     }
 
-    console.log('[DEBUG] verDetalhes - registro completo:', registro);
-    console.log('[DEBUG] itens_status raw:', registro.itens_status);
-
     const modal = document.getElementById("modalDetalhes");
     const container = document.getElementById("containerDesenho");
 

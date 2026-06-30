@@ -36,7 +36,6 @@
 | M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
 | M14 | Front | 🟡 | ⬜ | Resiliência móvel (timeout + guard de double-submit) |
 | M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
-| B1 | Front+Back | 🟢 | ⬜ | Remover `console.log` de debug (PII no console) |
 | B2 | Back | 🟢 | ⬜ | Política de senha mais forte |
 | B3 | Back | 🟢 | ⬜ | Limite de payload (rever se ainda distinto vs A4) |
 | B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
@@ -56,9 +55,7 @@
 | B18 | Back | 🟢 | ⬜ | Drain do pool no shutdown gracioso |
 | B19 | Back/Infra | 🟢 | ⬜ | TLS no banco + remover `allowPublicKeyRetrieval` |
 | B20 | DB | 🟢 | ⬜ | Verificar que `auto_increment` é `BIGINT` (checup único) |
-| B21 | Front | 🟢 | ⬜ | jsPDF via CDN morto em `checklist.html` (app LAN) |
 | B22 | Back | 🟢 | ⬜ | Sem compressão (gzip/brotli) no backend |
-| B23 | Front | 🟢 | ⬜ | Cache-buster em `veiculo.png` (re-download móvel) |
 | B24 | Front | 🟢 | ⬜ | Atributos de teclado mobile nos inputs |
 | I1 | Infra | 🔴 | ⬜ | Windows Server 2012 fora de suporte (bloqueia público) |
 | Deploy | Infra | — | ⬜ | Checklist de produção (HTTPS, CORS, CSP, HSTS, trust proxy) |
@@ -233,10 +230,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
 
 ## 🟢 Baixo
 
-- ⬜ **B1 — Remover `console.log` de debug remanescentes**
-  `admin.js:184-185` (`[DEBUG]` dumpando registro completo — PII no console),
-  `auth.js:8,23`, `checklist.js`, `frota.js`, `pdf-engine.js`. Limpeza de higiene.
-
 - ⬜ **B2 — Política de senha fraca**
   `validate.middleware.js` exige senha com **mín. 6 caracteres** no cadastro. Considerar
   política mais forte (comprimento + complexidade) conforme exigência do cliente.
@@ -387,28 +380,12 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   WHERE TABLE_SCHEMA = DATABASE() AND EXTRA = 'auto_increment';
   ```
 
-- ⬜ **B21 — Dependência morta do jsPDF via CDN em `checklist.html` (peso + dependência de internet num app LAN)** *(auditoria mobile 2026-06-24)*
-  `checklist.html` carrega `jspdf.umd.min.js` + `jspdf.plugin.autotable.min.js` do **CDN externo**
-  (`cdnjs.cloudflare.com`), **render-blocking** (antes de `config.js`/`checklist.js`). Mas
-  `js/pdf-engine.js` (que define `gerarPDF`) **não é incluído em nenhuma página** e `gerarPDF` **nunca é
-  chamado** — o botão "FINALIZAR CHECKLIST E GERAR RELATÓRIO" só faz o POST, sem gerar PDF no cliente.
-  - **Impacto mobile:** ~150 KB+ de JS baixados à toa por celular **e**, pior, uma **dependência de
-    internet embutida num app de LAN** — se a LAN não tem saída para a internet, as requests ao cdnjs
-    **penduram/falham** e atrasam a interatividade da página de checklist.
-  - **Correção:** remover as duas tags de CDN (e o `pdf-engine.js` morto). Se PDF no cliente for
-    desejado, **self-hostar** o jsPDF localmente (servir do `:10081`), **nunca via CDN** num app de LAN.
-
 - ⬜ **B22 — Sem compressão (gzip/brotli) no backend** *(auditoria mobile 2026-06-24)*
   Nenhum middleware de compressão (sem dep `compression`). JSON trafega cru — caro em rede móvel,
   sobretudo relatórios com `mapa_avaria_base64` (base64 é altamente compressível, ~30–40% com gzip).
   Payloads do motorista são pequenos; o ganho maior é nos relatórios admin. Mitigado em parte quando
   o Cloudflare entrar (comprime no edge), mas `compression()` no Express é um ganho barato já na LAN.
   Relaciona-se a **A11** (**concluído** — base64 já não trafega nas listas).
-
-- ⬜ **B23 — `veiculo.png` com cache-buster a cada checklist (re-download em dados móveis)** *(auditoria mobile 2026-06-24)*
-  `checklist.js` carrega a imagem do veículo com `?t=${timestamp}` (`inicializarCanvas`), **derrotando o
-  cache** — re-baixa uma imagem **estática** a cada abertura de checklist, gastando dados móveis. Remover
-  o cache-buster e deixar o navegador cachear (a imagem não muda).
 
 - ⬜ **B24 — Atributos de teclado mobile nos inputs** *(auditoria mobile 2026-06-24)*
   Os inputs **críticos do motorista já estão certos** (`km` = `type=number` → teclado numérico;

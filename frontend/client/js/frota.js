@@ -50,7 +50,6 @@ function iniciarChecklist(id, placa, tipo, modelo) {
     localStorage.setItem('veiculo_atual', placa);
     localStorage.setItem('modelo_veiculo', modelo);
 
-    console.log(`[ID SALVO]: ${id}`);
     window.location.href = 'checklist.html';
 }
 

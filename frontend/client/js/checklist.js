@@ -48,13 +48,12 @@ const ctx = canvas.getContext("2d");
 let drawing = false;
 
 function inicializarCanvas() {
-  const timestamp = new Date().getTime();
-  imgVeiculo.src = `${CONFIG.API_BASE_URL.replace('/api', '')}/veiculo.png?t=${timestamp}`;
+  // veiculo.png é estático — sem cache-buster, deixa o navegador cachear (B23).
+  imgVeiculo.src = `${CONFIG.API_BASE_URL.replace('/api', '')}/veiculo.png`;
 
   imgVeiculo.onload = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(imgVeiculo, 0, 0, canvas.width, canvas.height);
-    console.log("[✓] Canvas carregado");
   };
 
   imgVeiculo.onerror = () => {

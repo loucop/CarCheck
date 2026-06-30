@@ -5,8 +5,6 @@
 document.getElementById("loginForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    console.log("Iniciando tentativa de login...");
-
     const matricula = document.getElementById("usuario").value;
     const senha = document.getElementById("senha").value;
 
@@ -21,8 +19,6 @@ document.getElementById("loginForm")?.addEventListener("submit", async (e) => {
         const dados = await resposta.json();
 
         if (dados.success) {
-            console.log(`Sucesso! Bem-vindo, ${dados.data.user.nome}`);
-
             // M4 Fase 2: a sessão agora vive no cookie httpOnly (setado pelo
             // backend na resposta do login). Não guardamos mais o token em
             // localStorage; apenas os dados do usuário p/ a UI (nome, nível).

@@ -562,6 +562,29 @@ removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN).
 
 ## 🟢 Baixo — concluído
 
+- ✅ **B1 — Remover `console.log` de debug remanescentes** *(concluído em 2026-06-30)*
+  Removidos os `console.log` de debug do frontend, mantendo `console.error`/`console.warn` (log legítimo de
+  erro): `admin.js` (dump `[DEBUG]` do registro completo + `itens_status` — **PII no console**), `auth.js`
+  (`"Iniciando tentativa de login..."` + `Sucesso! Bem-vindo, ${nome}` — vazava o nome do usuário),
+  `checklist.js` (`[✓] Canvas carregado`), `frota.js` (`[ID SALVO]`). O `pdf-engine.js` (que tinha o log
+  `[✓] PDF gerado`) foi removido inteiro pelo **B21**. Higiene; verificado por `grep` (nenhum `console.log`
+  restante em `frontend/client/js/`) + eyeball do usuário no console do navegador.
+
+- ✅ **B21 — Dependência morta do jsPDF via CDN em `checklist.html`** *(concluído em 2026-06-30)*
+  Removidas as duas tags `<script>` de CDN externo (`cdnjs.cloudflare.com`: `jspdf.umd.min.js` +
+  `jspdf.plugin.autotable.min.js`) do `checklist.html` e **deletado** o `js/pdf-engine.js` (morto:
+  `gerarPDF` nunca era incluído em página nem chamado). Elimina ~150 KB de JS render-blocking baixado à toa
+  e — mais importante — uma **dependência de internet embutida num app de LAN** (sem saída p/ internet, as
+  requests ao cdnjs penduravam/atrasavam a página). Se PDF no cliente voltar a ser desejado, self-hostar o
+  jsPDF no `:10081`, nunca via CDN. Verificado por `grep` (nenhuma referência a `jspdf`/`pdf-engine`) +
+  eyeball do usuário (Network sem requests ao cdnjs).
+
+- ✅ **B23 — `veiculo.png` com cache-buster a cada checklist** *(concluído em 2026-06-30)*
+  Removido o `?t=${timestamp}` do `src` de `veiculo.png` em `inicializarCanvas` (`checklist.js`). A imagem é
+  **estática**; sem o cache-buster o navegador a cacheia em vez de re-baixar a cada abertura de checklist
+  (economia de dados móveis). Verificado por eyeball do usuário (Network: `veiculo.png` sem query string,
+  canvas ainda carrega e desenha).
+
 - ✅ **B4 — Query não-sargável no guard diário (sargável + anti-join)** *(concluído em 2026-06-30 — deployado, testado por curl e commitado `dbefece`)*
   `findPendingTodayByMatricula` (roda em **todo** submit de checklist & abertura de BDV) e seu irmão
   A6 `findPendingDetailTodayByMatricula` combinavam dois problemas de escala: `DATE(data_inspecao) =
