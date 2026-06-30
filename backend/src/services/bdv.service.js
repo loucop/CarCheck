@@ -90,92 +90,117 @@ const bdvService = {
     },
 
     async addParada(conn, bdv_id, matricula, data) {
-        const bdv = await bdvRepository.findBDVById(conn, bdv_id);
+        try {
+            await conn.beginTransaction();
 
-        if (!bdv) {
-            throw {
-                message: 'BDV não encontrado',
-                code: ERROR_CODES.RESOURCE_NOT_FOUND,
-                statusCode: 404
-            };
+            // Lock the BDV row so the ownership/status/KM checks and the insert are
+            // serialized against concurrent paradas / encerramento (M10: TOCTOU re-lock).
+            const bdv = await bdvRepository.findBDVByIdForUpdate(conn, bdv_id);
+
+            if (!bdv) {
+                throw {
+                    message: 'BDV não encontrado',
+                    code: ERROR_CODES.RESOURCE_NOT_FOUND,
+                    statusCode: 404
+                };
+            }
+
+            if (bdv.matricula !== matricula) {
+                throw {
+                    message: 'Acesso negado: este BDV pertence a outro motorista',
+                    code: ERROR_CODES.INSUFFICIENT_PERMISSION,
+                    statusCode: 403
+                };
+            }
+
+            if (bdv.status !== 'aberto') {
+                throw {
+                    message: 'BDV já encerrado',
+                    code: ERROR_CODES.VALIDATION_ERROR,
+                    statusCode: 409
+                };
+            }
+
+            // Read under the lock: a concurrent addParada can't slip in between this
+            // read and the insert below, so two paradas can't both pass a stale KM.
+            const lastParada = await bdvRepository.findLastParada(conn, bdv_id);
+            if (lastParada && lastParada.km != null && data.km != null && data.km < lastParada.km) {
+                throw {
+                    message: `KM inválido: informado (${data.km}) menor que o da última parada (${lastParada.km})`,
+                    code: ERROR_CODES.KM_INVALID,
+                    statusCode: 400
+                };
+            }
+
+            if (data.km != null && data.km < bdv.km_inicial) {
+                throw {
+                    message: `KM da parada não pode ser menor que o KM inicial do BDV (${bdv.km_inicial})`,
+                    code: ERROR_CODES.KM_INVALID,
+                    statusCode: 400
+                };
+            }
+
+            const paradaId = await bdvRepository.addParada(conn, bdv_id, data);
+
+            await conn.commit();
+
+            return { id: String(paradaId), bdv_id: String(bdv_id) };
+
+        } catch (err) {
+            await conn.rollback();
+            throw err;
         }
-
-        if (bdv.matricula !== matricula) {
-            throw {
-                message: 'Acesso negado: este BDV pertence a outro motorista',
-                code: ERROR_CODES.INSUFFICIENT_PERMISSION,
-                statusCode: 403
-            };
-        }
-
-        if (bdv.status !== 'aberto') {
-            throw {
-                message: 'BDV já encerrado',
-                code: ERROR_CODES.VALIDATION_ERROR,
-                statusCode: 409
-            };
-        }
-
-        const lastParada = await bdvRepository.findLastParada(conn, bdv_id);
-        if (lastParada && lastParada.km != null && data.km != null && data.km < lastParada.km) {
-            throw {
-                message: `KM inválido: informado (${data.km}) menor que o da última parada (${lastParada.km})`,
-                code: ERROR_CODES.KM_INVALID,
-                statusCode: 400
-            };
-        }
-
-        if (data.km != null && data.km < bdv.km_inicial) {
-            throw {
-                message: `KM da parada não pode ser menor que o KM inicial do BDV (${bdv.km_inicial})`,
-                code: ERROR_CODES.KM_INVALID,
-                statusCode: 400
-            };
-        }
-
-        const paradaId = await bdvRepository.addParada(conn, bdv_id, data);
-
-        return { id: String(paradaId), bdv_id: String(bdv_id) };
     },
 
     async closeParada(conn, bdv_id, parada_id, matricula, data) {
-        const bdv = await bdvRepository.findBDVById(conn, bdv_id);
+        try {
+            await conn.beginTransaction();
 
-        if (!bdv) {
-            throw {
-                message: 'BDV não encontrado',
-                code: ERROR_CODES.RESOURCE_NOT_FOUND,
-                statusCode: 404
-            };
+            // Lock the BDV row before re-checking status and updating the parada (M10).
+            const bdv = await bdvRepository.findBDVByIdForUpdate(conn, bdv_id);
+
+            if (!bdv) {
+                throw {
+                    message: 'BDV não encontrado',
+                    code: ERROR_CODES.RESOURCE_NOT_FOUND,
+                    statusCode: 404
+                };
+            }
+
+            if (bdv.matricula !== matricula) {
+                throw {
+                    message: 'Acesso negado: este BDV pertence a outro motorista',
+                    code: ERROR_CODES.INSUFFICIENT_PERMISSION,
+                    statusCode: 403
+                };
+            }
+
+            if (bdv.status !== 'aberto') {
+                throw {
+                    message: 'BDV já encerrado',
+                    code: ERROR_CODES.VALIDATION_ERROR,
+                    statusCode: 409
+                };
+            }
+
+            const affected = await bdvRepository.closeParada(conn, bdv_id, parada_id, data);
+
+            if (affected === 0) {
+                throw {
+                    message: 'Parada não encontrada neste BDV',
+                    code: ERROR_CODES.RESOURCE_NOT_FOUND,
+                    statusCode: 404
+                };
+            }
+
+            await conn.commit();
+
+            return { bdv_id: String(bdv_id), parada_id: String(parada_id) };
+
+        } catch (err) {
+            await conn.rollback();
+            throw err;
         }
-
-        if (bdv.matricula !== matricula) {
-            throw {
-                message: 'Acesso negado: este BDV pertence a outro motorista',
-                code: ERROR_CODES.INSUFFICIENT_PERMISSION,
-                statusCode: 403
-            };
-        }
-
-        if (bdv.status !== 'aberto') {
-            throw {
-                message: 'BDV já encerrado',
-                code: ERROR_CODES.VALIDATION_ERROR,
-                statusCode: 409
-            };
-        }
-
-        const affected = await bdvRepository.closeParada(conn, bdv_id, parada_id, data);
-
-        if (affected === 0) {
-            throw {
-                message: 'Parada não encontrada neste BDV',
-                code: ERROR_CODES.RESOURCE_NOT_FOUND,
-                statusCode: 404
-            };
-        }
-
-        return { bdv_id: String(bdv_id), parada_id: String(parada_id) };
     },
 
     async closeBDV(conn, bdv_id, matricula, data) {
@@ -214,19 +239,31 @@ const bdvService = {
             };
         }
 
-        const maxParadaKm = await bdvRepository.findMaxParadaKm(conn, bdv_id);
-        if (maxParadaKm != null && data.km_final < maxParadaKm) {
-            throw {
-                message: `KM final (${data.km_final}) menor que o KM máximo das paradas (${maxParadaKm})`,
-                code: ERROR_CODES.KM_INVALID,
-                statusCode: 400
-            };
-        }
-
         try {
             await conn.beginTransaction();
 
-            // Lock vehicle row before updating KM
+            // Re-lock the BDV row and re-assert the racy invariants under the lock (M10):
+            // a concurrent "encerrar" may have already closed it, and a concurrent
+            // addParada may have pushed the max parada KM above km_final.
+            const locked = await bdvRepository.findBDVByIdForUpdate(conn, bdv_id);
+            if (!locked || locked.status !== 'aberto') {
+                throw {
+                    message: 'BDV já encerrado',
+                    code: ERROR_CODES.VALIDATION_ERROR,
+                    statusCode: 409
+                };
+            }
+
+            const maxParadaKm = await bdvRepository.findMaxParadaKm(conn, bdv_id);
+            if (maxParadaKm != null && data.km_final < maxParadaKm) {
+                throw {
+                    message: `KM final (${data.km_final}) menor que o KM máximo das paradas (${maxParadaKm})`,
+                    code: ERROR_CODES.KM_INVALID,
+                    statusCode: 400
+                };
+            }
+
+            // Lock vehicle row before updating KM (global lock order: bdv → veiculo)
             await veiculoRepository.findByIdWithLock(conn, bdv.veiculo_id);
 
             await bdvRepository.closeBDV(conn, bdv_id, data);

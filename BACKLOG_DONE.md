@@ -423,6 +423,26 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
+- ✅ **M10 — TOCTOU em `closeBDV` / paradas (re-lock dentro da transação)** *(concluído em 2026-06-30; verificado no servidor vivo)*
+  `addParada`/`closeParada` rodavam **sem transação e sem row-lock**, e `closeBDV` checava o status do BDV
+  **fora** da transação (travava só o veículo) — dois requests concorrentes (double-tap/retry) podiam ambos
+  passar (paradas duplicadas / KM obsoleto / duplo encerramento sobrescrevendo `km_final`).
+  - **Correção (`bdv.repository.js`):** novo `findBDVByIdForUpdate` — `SELECT ... FOR UPDATE` enxuto que
+    trava **só a linha do `bdv`** (sem JOINs/paradas), para re-validação dentro da transação.
+  - **Correção (`bdv.service.js`):**
+    - `addParada` / `closeParada` agora abrem transação, travam a linha do BDV via `findBDVByIdForUpdate`,
+      e só então fazem as checagens de ownership/status/KM e a escrita — tudo serializado sob o lock.
+    - `closeBDV` mantém os rejects fail-fast fora da tx, mas dentro da tx **re-trava a linha do `bdv`** e
+      **re-afirma `status='aberto'`**; o teto de `maxParadaKm` também foi movido para dentro do lock (um
+      `addParada` concorrente não consegue mais empurrar um KM maior depois da checagem).
+  - **Ordem de lock global `bdv → veiculo`** (igual ao `openBDV`, que trava só o veículo e insere uma linha
+    nova de bdv) — sem ciclo de deadlock.
+  - **Verificado (curl e2e, 10.10.1.100:3000):** fluxo completo do motorista (checklist → abrir BDV →
+    parada → encerrar) sem regressão (201/200); **dois `encerrar` concorrentes** no mesmo BDV →
+    sempre **um `200` + um `409` "BDV já encerrado"** (2 rodadas), nunca dois `200`, sem `500` nem
+    deadlock; estado do veículo transita `em_uso → disponivel` com `km_atual` correto.
+  - **Relacionado:** **B16** (cap de paradas/BDV) e **M14** (guard de double-submit no front) seguem abertos.
+
 - ✅ **M13 — Enumeração de usuário por timing no login** *(concluído em 2026-06-30; verificado no servidor vivo)*
   `authService.login` retornava **imediatamente** no caminho "usuário inexistente", enquanto um usuário
   real pagava ~100ms de `bcrypt.compare` — a diferença permitia enumerar `matricula`/`CPF` válidos por

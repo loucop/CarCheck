@@ -32,7 +32,6 @@
 | M7 | Back/Infra | 🟡 | ⬜ | Rate limit global + `/health` como vetor de DoS |
 | M8 | Back/DB | 🟡 | ⬜ | Pool: `acquireTimeout` + teto de starvation |
 | M9 | Arch | 🟡 | ⬜ | Chokepoint central de escopo de tenant (pré-req M6) |
-| M10 | Back | 🟡 | ⬜ | TOCTOU em `closeBDV`/paradas (re-lock na transação) |
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
 | M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
 | M14 | Front | 🟡 | ⬜ | Resiliência móvel (timeout + guard de double-submit) |
@@ -181,17 +180,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     query builder que injeta o predicado de tenant centralmente, ou escopo de conexão por tenant — de
     modo que "esqueci de filtrar" seja **estruturalmente impossível**, não uma esperança de code-review.
     Subitem de planejamento do **M6**; pareia com **B10/B17** (migrations/schema versionado).
-
-- ⬜ **M10 — TOCTOU em `closeBDV` / paradas (re-lock dentro da transação)** *(achado na auditoria 2026-06-24)*
-  - `addParada` e `closeParada` rodam **sem transação e sem row-lock**: leem o BDV, checam
-    `status='aberto'` e a monotonicidade de KM, depois escrevem. Dois requests concorrentes (double-tap,
-    retry) podem ambos passar — paradas duplicadas, ou duas paradas que satisfazem um `lastParada.km`
-    obsoleto. Baixa severidade hoje (um motorista, um device), mas real.
-  - `closeBDV` lê o status do BDV **fora** da transação (fail-fast), abre a tx e trava só a linha do
-    **veículo**, sem re-checar o status do BDV sob o lock. Dois `encerrar` concorrentes podem ambos
-    prosseguir; o segundo sobrescreve `km_final` e re-roda `updateKm`.
-  - **Correção:** re-`SELECT ... FOR UPDATE` na linha do `bdv` dentro da transação e re-afirmar
-    `status='aberto'` antes de escrever (mesma disciplina do lock de veículo).
 
 - ⬜ **M11 — Reconciliação de drift da âncora de KM** *(achado na auditoria 2026-06-24)*
   `veiculos.km_atual` é a âncora monotônica canônica, mas correções podem dessincronizá-la: o caminho de
@@ -464,4 +452,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, M13, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M10, M13, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.

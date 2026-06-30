@@ -128,6 +128,20 @@ const bdvRepository = {
         return { ...bdvRows[0], paradas };
     },
 
+    // Lean row-lock on the bdv row for transactional re-validation (M10).
+    // No JOINs/paradas: locks ONLY the bdv row, not funcionarios/veiculos.
+    // Must run inside an open transaction for the lock to be held.
+    async findBDVByIdForUpdate(conn, id) {
+        const rows = await conn.query(
+            `SELECT id, matricula, veiculo_id, km_inicial, status
+             FROM bdv
+             WHERE id = ?
+             FOR UPDATE`,
+            [id]
+        );
+        return rows[0] || null;
+    },
+
     async findLastParada(conn, bdv_id) {
         const rows = await conn.query(
             'SELECT km FROM bdv_paradas WHERE bdv_id = ? ORDER BY id DESC LIMIT 1',
