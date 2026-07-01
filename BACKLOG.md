@@ -25,7 +25,6 @@
 | ID | Domínio | Pri | St | Resumo |
 |------|-----------|----|----|--------|
 | A7 | Front | 🟠 | 🔵 | UI de correção do vistoriador (slice 4; backend pronto) |
-| A12 | DB | 🟠 | ⬜ | Índices em queries quentes (confirmar no banco vivo) |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
@@ -91,29 +90,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   (filesystem / object storage Cloudflare R2/S3), guardando só a URL/chave — mantém `checklists`
   pequena/quente e torna o particionamento/arquivamento trivial. Pareia com **B14** (retenção) e só
   vale a pena junto da publicação/Cloudflare.
-
-- ⬜ **A12 — Índices ausentes em queries quentes** *(achado na auditoria de escala 2026-06-24)*
-  Não há DDL no repo (schema só vive no banco — ver **B17**), então confirmar no banco vivo. As
-  formas das queries indicam os índices necessários; todas rodam a cada page-load / submit, então
-  degradam de seek para full-scan conforme as tabelas crescem:
-  | Query | Roda em | Índice |
-  |-------|---------|--------|
-  | `findActiveBDVByMatricula` (`matricula=? AND status='aberto'`) | todo load de menu/checklist/bdv | `(matricula, status)` |
-  | `findActiveBDVByVeiculoId` (`veiculo_id=? AND status='aberto'`) | toda abertura de BDV | `(veiculo_id, status)` |
-  | `findPendingTodayByMatricula` | todo submit de checklist & abertura de BDV | `(matricula, data_inspecao)` + `bdv(checklist_id)` (ver **B4**) |
-  | `findRelatorio` / `findAllBDV` (`ORDER BY data_* DESC`) | todo relatório | índice em `data_inspecao` / `data_abertura` |
-  | `findHistoricoByVeiculo` (`veiculo_id=? ORDER BY data_inspecao DESC`) | histórico do veículo | `(veiculo_id, data_inspecao)` |
-  - **Confirmar que as colunas de FK são `FOREIGN KEY` reais** (`checklists.veiculo_id`/`matricula`,
-    `bdv.veiculo_id`/`matricula`, `bdv_paradas.bdv_id`): no MariaDB uma FK declarada cria o índice de
-    apoio automaticamente. Se forem só FKs lógicas, os JOINs de todo relatório fazem scan. C1 já criou
-    a FK de `bdv.checklist_id`; verificar as demais.
-  - Auditar o estado atual:
-    ```sql
-    SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) cols
-    FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()
-    GROUP BY TABLE_NAME, INDEX_NAME;
-    ```
-
 
 ---
 
@@ -388,4 +364,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, M10, M13, M14, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M10, M13, M14, A12, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.

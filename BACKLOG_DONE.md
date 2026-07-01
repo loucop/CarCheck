@@ -27,6 +27,28 @@
 
 ## 🟠 Alto — concluído
 
+- ✅ **A12 — Índices em queries quentes** *(aplicado e verificado no banco vivo em 2026-07-01)*
+  Auditoria do `information_schema` confirmou que **todas as FKs são reais** (índices single-col
+  auto-criados em `bdv.checklist_id`/`matricula`/`veiculo_id`, `checklists.matricula`/`veiculo_id`,
+  `bdv_paradas.bdv_id`) — nenhuma coluna de JOIN ficou sem índice. Faltavam só os **compostos** (range de
+  data no guard diário, sort do histórico) e os índices de **sort puro** dos relatórios admin. DDL aplicado
+  (registrado aqui porque não há `schema.sql` versionado — ver **B17**):
+  ```sql
+  CREATE INDEX idx_checklists_matricula_data ON checklists (matricula, data_inspecao);
+  CREATE INDEX idx_checklists_veiculo_data   ON checklists (veiculo_id, data_inspecao);
+  CREATE INDEX idx_checklists_data           ON checklists (data_inspecao);
+  CREATE INDEX idx_bdv_matricula_status      ON bdv (matricula, status);
+  CREATE INDEX idx_bdv_veiculo_status        ON bdv (veiculo_id, status);
+  CREATE INDEX idx_bdv_data_abertura         ON bdv (data_abertura);
+  ```
+  - `bdv(checklist_id)` (FK `bdv_ibfk_1`, serve o anti-join `NOT EXISTS` do guard) e `bdv_paradas(bdv_id)`
+    (FK) **já existiam** — não recriados.
+  - **Bônus:** ao criar os compostos, o InnoDB **auto-dropou** os índices single-col redundantes
+    (`bdv.matricula`/`veiculo_id`, `checklists.matricula`/`veiculo_id`) — os compostos passam a suportar as
+    FKs pelo prefixo. Estado final sem redundância, sem drop manual.
+  - Verificação: re-inventário do `information_schema.STATISTICS` mostrou os 6 `idx_*`. `EXPLAIN` nas tabelas
+    pequenas de hoje ainda pode escolher scan (correto — o ganho aparece com o crescimento).
+
 - ✅ **A8 — `bdv.html`: ordem dos guards (viagem ativa antes do guard de veículo)** *(fix em 2026-06-17; deployado e verificado em browser 2026-06-30)*
   Um motorista **em viagem** com `localStorage.veiculo_id` vazio era mandado para `selecao.html` **antes**
   de `/bdv/ativo` ser checado → não conseguia chegar à própria viagem ativa.
