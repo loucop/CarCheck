@@ -632,6 +632,19 @@ removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN).
 
 ## 🟢 Baixo — concluído
 
+- ✅ **B2 — Política de senha mais forte** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
+  `createFuncionario` (`validate.middleware.js`) exigia só **mín. 6 caracteres**. Agora: **mín. 8** +
+  ao menos **uma letra** e **um número** (regex Zod). Vale só para usuários **novos** — não afeta logins
+  existentes (senhas legadas/plaintext seguem via dual-support no `auth.service`). Verificado no vivo:
+  `"123"` → 400 (curto + sem letra); `"abcdefgh"` → 400 (sem número); sem usuário criado (falha antes do INSERT).
+
+- ✅ **B16 — Cap de paradas por BDV** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
+  `addParada` era escrita ilimitada por viagem (token comprometido / bug de UI inflava `bdv_paradas` sem
+  teto). Agora `bdv.service.addParada` conta as paradas **sob o lock do BDV** (`countParadas` no repo, mesma
+  serialização do guard de KM — inserts concorrentes não furam o cap) e rejeita com **409** ao atingir
+  `BDV_MAX_PARADAS` (env, default 200). Verificado por construção (contagem sob lock + threshold) + boot limpo;
+  prova do 409 disponível baixando o teto via env sob demanda.
+
 - ✅ **B7 — XSS nas telas do motorista** *(concluído em 2026-07-01; deployado e testado)*
   A auditoria de A1 cobriu só as páginas admin; esta fechou os sinks do lado motorista (auditados 2026-06-24):
   - **`frota.js` (era a aresta afiada):** os cards eram montados com `innerHTML +=` interpolando

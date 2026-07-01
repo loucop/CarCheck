@@ -150,6 +150,14 @@ const bdvRepository = {
         return rows[0] || null;
     },
 
+    async countParadas(conn, bdv_id) {
+        const rows = await conn.query(
+            'SELECT COUNT(*) AS total FROM bdv_paradas WHERE bdv_id = ?',
+            [bdv_id]
+        );
+        return Number(rows[0]?.total ?? 0);
+    },
+
     async findMaxParadaKm(conn, bdv_id) {
         const rows = await conn.query(
             'SELECT MAX(km) AS max_km FROM bdv_paradas WHERE bdv_id = ?',

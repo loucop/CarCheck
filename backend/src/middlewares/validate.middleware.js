@@ -56,7 +56,13 @@ const schemas = {
         matricula: z.string().min(1, 'Matrícula obrigatória').max(20),
         nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(120),
         cpf: z.string().regex(/^\d{11}$/, 'CPF deve conter 11 dígitos'),
-        senha: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres').max(128),
+        // B2: política mais forte. Vale só para usuários NOVOS (esta rota) — não afeta
+        // logins existentes (senhas legadas/plaintext seguem via dual-support no auth).
+        senha: z.string()
+            .min(8, 'Senha deve ter no mínimo 8 caracteres')
+            .max(128)
+            .regex(/[A-Za-z]/, 'Senha deve conter ao menos uma letra')
+            .regex(/\d/, 'Senha deve conter ao menos um número'),
         nivel_acesso: z.enum(['admin', 'vistoriador', 'motorista'], {
             errorMap: () => ({ message: "Nível de acesso deve ser 'admin', 'vistoriador' ou 'motorista'" })
         }),

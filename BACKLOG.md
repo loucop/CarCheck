@@ -32,7 +32,6 @@
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
 | M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
 | M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
-| B2 | Back | 🟢 | ⬜ | Política de senha mais forte |
 | B3 | Back | 🟢 | ⬜ | Limite de payload (rever se ainda distinto vs A4) |
 | B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
 | M1-b | Front | 🟢 | ⬜ | Handlers inline `on*=` → `addEventListener` (sub-M1) |
@@ -45,7 +44,6 @@
 | B13 | Back+DB | 🟢 | ⬜ | Paginação keyset (OFFSET degrada em offsets profundos) |
 | B14 | DB/Infra | 🟢 | ⬜ | Estratégia de retenção / particionamento |
 | B15 | DB | 🟢 | ⬜ | `itens_status` JSON opaco em coluna TEXT |
-| B16 | Back | 🟢 | ⬜ | Cap de paradas por BDV |
 | B17 | DB/Infra | 🟢 | ⬜ | Versionar `schema.sql` no repo (pré-req B10/M9) |
 | B18 | Back | 🟢 | ⬜ | Drain do pool no shutdown gracioso |
 | B19 | Back/Infra | 🟢 | ⬜ | TLS no banco + remover `allowPublicKeyRetrieval` |
@@ -166,10 +164,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
 
 ## 🟢 Baixo
 
-- ⬜ **B2 — Política de senha fraca**
-  `validate.middleware.js` exige senha com **mín. 6 caracteres** no cadastro. Considerar
-  política mais forte (comprimento + complexidade) conforme exigência do cliente.
-
 - ⬜ **B3 — Limite de payload de 50mb**
   `express.json({ limit: '50mb' })` é amplo (necessário para o mapa de avaria em base64).
   Avaliar reduzir o limite global e isolar o upload pesado em rota dedicada (superfície de DoS).
@@ -263,11 +257,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   Guardado como string serializada → não dá para consultar/indexar dentro ("todos os checklists com
   freio=RUIM" = full-scan + parse no app). OK hoje; se analytics sobre condição de itens virar
   requisito, usar tipo `JSON` nativo ou tabela normalizada `checklist_itens`.
-
-- ⬜ **B16 — Cap de paradas por BDV** *(achado na auditoria 2026-06-24)*
-  `addParada` não limita o número de paradas por BDV; um motorista (ou cliente malcomportado) pode
-  anexar paradas ilimitadas, cada uma com `observacao` de 1000 chars. DoS menor de amplificação de
-  armazenamento por usuário autenticado. Um cap sensato (ex.: 200 paradas/BDV) fecha. Relaciona-se a **M10**.
 
 - ⬜ **B17 — Versionar `schema.sql` no repositório** *(achado na auditoria 2026-06-24)*
   O DDL só existe no banco vivo (sem `.sql` no repo; o CLAUDE.md é prosa). Além de ser o **B10**

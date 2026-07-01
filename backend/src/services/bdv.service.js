@@ -3,6 +3,11 @@ const veiculoRepository = require('../repositories/veiculo.repository');
 const checklistRepository = require('../repositories/checklist.repository');
 const { ERROR_CODES } = require('../utils/constants');
 
+// B16: teto de paradas por BDV. Sem cap, addParada é uma escrita ilimitada por
+// viagem (um token comprometido / bug de UI infla a tabela sem limite). Teto
+// generoso — uma rota real pesada tem dezenas de paradas, não centenas. Env.
+const MAX_PARADAS_POR_BDV = parseInt(process.env.BDV_MAX_PARADAS) || 200;
+
 const bdvService = {
     async openBDV(conn, data) {
         try {
@@ -116,6 +121,17 @@ const bdvService = {
             if (bdv.status !== 'aberto') {
                 throw {
                     message: 'BDV já encerrado',
+                    code: ERROR_CODES.VALIDATION_ERROR,
+                    statusCode: 409
+                };
+            }
+
+            // B16: teto de paradas. Contado sob o lock do BDV (mesma serialização do
+            // guard de KM abaixo), então N inserts concorrentes não furam o cap.
+            const totalParadas = await bdvRepository.countParadas(conn, bdv_id);
+            if (totalParadas >= MAX_PARADAS_POR_BDV) {
+                throw {
+                    message: `Limite de ${MAX_PARADAS_POR_BDV} paradas por BDV atingido`,
                     code: ERROR_CODES.VALIDATION_ERROR,
                     statusCode: 409
                 };
