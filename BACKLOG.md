@@ -45,7 +45,6 @@
 | B15 | DB | 🟢 | ⬜ | `itens_status` JSON opaco em coluna TEXT |
 | B17 | DB/Infra | 🟢 | ⬜ | Versionar `schema.sql` no repo (pré-req B10/M9) |
 | B19 | Back/Infra | 🟢 | ⬜ | TLS no banco + remover `allowPublicKeyRetrieval` |
-| B20 | DB | 🟢 | ⬜ | Verificar que `auto_increment` é `BIGINT` (checup único) |
 | B24 | Front | 🟢 | ⬜ | Atributos de teclado mobile nos inputs |
 | I1 | Infra | 🔴 | ⬜ | Windows Server 2012 fora de suporte (bloqueia público) |
 | Deploy | Infra | — | ⬜ | Checklist de produção (HTTPS, CORS, CSP, HSTS, trust proxy) |
@@ -256,15 +255,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   Inócuo num banco localhost/LAN, mas se o MariaDB for para um host separado/gerenciado, essa flag +
   conexão sem TLS é vetor de MITM/disclosure de credencial. Usar conexão TLS ao banco e remover a flag
   quando o banco deixar de ser local. (`backend/src/config/database.js`.)
-
-- ⬜ **B20 — Verificar que colunas `auto_increment` são `BIGINT`** *(verificação única — auditoria 2026-06-24)*
-  Auto-increment **não** é risco real (BIGINT + InnoDB + validação antes do INSERT → overflow inatingível
-  no domínio; gaps por rollback são cosméticos). Único checup: confirmar no DDL vivo que nenhuma PK ficou
-  `INT` (teto 2,14 bi). Se ficou, `ALTER ... MODIFY ... BIGINT` enquanto as tabelas estão pequenas.
-  ```sql
-  SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE() AND EXTRA = 'auto_increment';
-  ```
 
 - ⬜ **B24 — Atributos de teclado mobile nos inputs** *(auditoria mobile 2026-06-24)*
   Os inputs **críticos do motorista já estão certos** (`km` = `type=number` → teclado numérico;

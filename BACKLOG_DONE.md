@@ -649,6 +649,24 @@ removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN).
 
 ## 🟢 Baixo — concluído
 
+- ✅ **B20 — PKs `auto_increment` migradas de `int(11)` para `bigint(20)`** *(concluído em 2026-07-01; DDL aplicado no banco vivo + fix de app deployado e testado)*
+  O checup revelou que os PKs core **eram `int(11)`** (não `bigint`, ao contrário do que o CLAUDE.md dizia) —
+  só `correcoes*` (A7) já eram `bigint`. Overflow era inatingível no domínio (teto 2,14 bi), mas migrado como
+  seguro para o futuro público/multi-tenant **enquanto as tabelas estavam com mock data descartável**.
+  - **Schema (DDL no vivo, registrado aqui pois não há `schema.sql` versionado — ver B17):** `matricula`
+    (funcionarios), `id` (veiculos, checklists, bdv, bdv_paradas) → `bigint … AUTO_INCREMENT`, e as 7 colunas
+    FK que os referenciam, em lockstep (drop FK → `MODIFY` → re-add FK com os nomes originais `*_ibfk_*` /
+    `fk_correcoes_func`). Nullability preservada (`bdv.checklist_id` continua NULL).
+  - **Fix de app OBRIGATÓRIO (`src/config/database.js`):** o driver `mariadb` v3 devolve `BIGINT` como
+    **BigInt** JS. Sem tratamento, o guard de posse `bdv.matricula !== req.user.matricula` (bdv.service, 4
+    sites) quebra — `BigInt !== Number` é sempre `true` → **403 para o próprio dono**. Confirmado ao vivo: os
+    403 apareceram exatamente após a migração. Resolvido com `bigIntAsNumber: true` + `insertIdAsNumber: true`
+    (+ `checkNumberRange: true`): campos numéricos voltam a ser `Number` (teto efetivo 2^53, ~4 mi× o `int`),
+    tornando o app agnóstico a int/bigint. **Requer re-login** (o token antigo trazia `matricula` string).
+  - **Verificado no vivo pós-fix:** cadeia completa do motorista — checklist → abrir BDV → **addParada 201**
+    → **encerrar 200** (os guards de posse passam); relatórios admin, histórico, `/correcoes` e ambos os
+    logins → 200. Ver [[schema-pk-bigint-and-driver-config]].
+
 - ✅ **B2 — Política de senha mais forte** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
   `createFuncionario` (`validate.middleware.js`) exigia só **mín. 6 caracteres**. Agora: **mín. 8** +
   ao menos **uma letra** e **um número** (regex Zod). Vale só para usuários **novos** — não afeta logins
