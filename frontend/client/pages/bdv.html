@@ -617,7 +617,7 @@
             <div class="parada-meta">
               Saída: ${formatarData(p.hora_saida)}
               ${p.hora_chegada ? ` &nbsp;|&nbsp; Chegada: ${formatarData(p.hora_chegada)}` : ''}
-              ${p.km ? ` &nbsp;|&nbsp; KM: ${p.km}` : ''}
+              ${p.km ? ` &nbsp;|&nbsp; KM: ${escHtml(String(p.km))}` : ''}
               ${p.observacao ? `<br>${escHtml(p.observacao)}` : ''}
             </div>
             ${!p.hora_chegada ? `
@@ -877,7 +877,9 @@
       function formatarData(str) {
         if (!str) return '—';
         const d = new Date(str);
-        if (isNaN(d)) return str;
+        // B7: o fallback de entrada não-data era devolvido CRU e interpolado em
+        // innerHTML (renderizarParadas) — escapa p/ fechar o mesmo padrão do A1.
+        if (isNaN(d)) return escHtml(String(str));
         return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
       }
 

@@ -22,16 +22,36 @@ async function carregarVeiculos() {
         const container = document.getElementById('lista-veiculos');
         container.innerHTML = "";
 
+        // B7: monta os cards via DOM API (textContent + addEventListener), não por
+        // interpolação em string HTML. Elimina a injeção de XSS/JS que existia ao
+        // colar modelo/placa crus no HTML e, pior, dentro do atributo onclick com
+        // aspas simples (um `'` no modelo quebrava a string e injetava JS). Também
+        // remove um handler inline, alinhado ao M1-b (rumo a CSP estrito).
         veiculos.forEach(v => {
             const tipoVeiculo = v.tipo || 'carro';
 
-            container.innerHTML += `
-                <div class="card" style="cursor: pointer; margin-bottom: 10px;" 
-                     onclick="iniciarChecklist('${v.id}', '${v.placa}', '${tipoVeiculo}', '${v.modelo}')">
-                    <h3>${v.modelo}</h3>
-                    <p>Placa: <strong>${v.placa}</strong></p>
-                    <small style="color: #94a3b8">Toque para iniciar</small>
-                </div>`;
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.style.cursor = 'pointer';
+            card.style.marginBottom = '10px';
+
+            const h3 = document.createElement('h3');
+            h3.textContent = v.modelo;
+
+            const p = document.createElement('p');
+            p.textContent = 'Placa: ';
+            const strong = document.createElement('strong');
+            strong.textContent = v.placa;
+            p.appendChild(strong);
+
+            const small = document.createElement('small');
+            small.style.color = '#94a3b8';
+            small.textContent = 'Toque para iniciar';
+
+            card.append(h3, p, small);
+            card.addEventListener('click', () =>
+                iniciarChecklist(v.id, v.placa, tipoVeiculo, v.modelo));
+            container.appendChild(card);
         });
     } catch (erro) {
         // 401 já tratado por apiFetch (redirect ao login em curso) — não renderizar erro.
