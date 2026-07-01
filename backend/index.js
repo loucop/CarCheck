@@ -9,6 +9,7 @@ require('dotenv').config();
 const routes = require('./src/routes');
 const { corsOrigins } = require('./src/config/cors');
 const { csrfProtection } = require('./src/middlewares/csrf.middleware');
+const { apiRateLimiter } = require('./src/middlewares/rateLimit.middleware');
 const { errorHandler, notFoundHandler } = require('./src/middlewares/errorHandler.middleware');
 const logger = require('./src/utils/logger');
 
@@ -87,6 +88,9 @@ app.use(cors({
     methods: ['GET', 'POST', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+// M7: rate limiter global de escrita, cedo na cadeia — rejeita floods antes de
+// parsear body/checar CSRF. Métodos seguros (GET/HEAD/OPTIONS) passam livres.
+app.use(apiRateLimiter);
 // A4-H2: limite de body por rota. Default global apertado (100kb); só o
 // POST /api/checklist carrega payload grande (mapa de avaria base64) → 1mb.
 // Evita amplificação de DoS/armazenamento por usuário autenticado em todas as

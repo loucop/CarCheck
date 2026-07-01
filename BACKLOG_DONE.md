@@ -445,19 +445,23 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
-- 🔵 **M7 (slice `/health`) — `/health` como vetor de DoS de pool** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
-  `GET /api/health` era público, sem auth, e pegava uma conexão do pool (`SELECT 1`) a **cada** chamada —
-  martelar o endpoint esgotava as 10 conexões e derrubava o app (pareia com o fail-fast do **M8**). Fechado
-  em `src/routes/index.js`:
-  - **Cache do resultado** por `HEALTH_CACHE_MS` (env, default 5000). Sob qualquer taxa de request, o pool é
-    tocado no **máx. 1x por janela**, não 1x por request; as demais chamadas servem do cache (mesmo shape de
-    resposta, inclusive nos 503 de banco fora).
-  - **Coalescing anti-thundering-herd:** requests concorrentes no instante da expiração aguardam a **mesma**
-    Promise em voo (`healthInFlight`) em vez de cada um pegar sua própria conexão.
-  - `HEALTH_CACHE_MS` documentado no `.env.example`. Verificado no vivo: 20 requests rápidos → `timestamp`
-    idêntico (pool tocado 1x); após a janela, `timestamp` avança (re-check vivo).
-  - **Resto do M7 segue aberto** (🔵 no `BACKLOG.md`): rate limit das rotas de correção (A7) e cap de
-    `addParada` (**B16**).
+- ✅ **M7 — Rate limiting além do login + `/health` como vetor de DoS** *(concluído em 2026-07-01; deployado e testado no servidor vivo, em duas fatias)*
+  Só `POST /api/login` era limitado; o resto era irrestrito, e `/health` esgotava o pool. Fechado:
+  - **Fatia `/health` (`src/routes/index.js`):** era público, sem auth, e pegava uma conexão do pool
+    (`SELECT 1`) a **cada** chamada — martelar esgotava as 10 conexões (pareia com o fail-fast do **M8**).
+    Agora **cacheia o resultado** por `HEALTH_CACHE_MS` (env, default 5000) e **coalesce checagens
+    concorrentes** numa única Promise em voo (`healthInFlight`, anti-thundering-herd): sob qualquer taxa, o
+    pool é tocado no **máx. 1x por janela**. Verificado: 20 requests → `timestamp` idêntico; após a janela,
+    avança.
+  - **Fatia rate limiter global (`src/middlewares/rateLimit.middleware.js`, montado cedo no `index.js`):**
+    limiter in-memory por IP em **métodos que alteram estado** (POST/PATCH/…); GET/HEAD/OPTIONS passam livres
+    (dashboards fazem muitos GETs; `/health` já é cacheado). Cobre as rotas de correção (A7) e qualquer flood
+    de escrita. Default `RATE_LIMIT_MAX=120` / `RATE_LIMIT_WINDOW_MS=60000` (env). Novo
+    `ERROR_CODES.RATE_LIMIT_EXCEEDED` → `429`. Mesma premissa single-process do login limiter (store
+    compartilhado fica no **M2**); chaveado por IP (por-usuário é refinamento futuro). Verificado no vivo:
+    120 writes passam, o 121º → `429 RATE_LIMIT_EXCEEDED`; GET/`/health` seguem 200 durante o bloqueio.
+  - **Fora do escopo do M7:** o **cap de negócio** de paradas por BDV (máx. N por viagem) continua sendo o
+    **B16** — é um limite de contagem no serviço/DB, não rate limit por IP.
 
 - ✅ **M8 — Pool de conexões: `acquireTimeout` + mapeamento 503** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
   Toda request segurava uma conexão do pool (10) por toda a sua vida; sob starvation (~10 leituras lentas

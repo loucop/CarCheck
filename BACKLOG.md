@@ -28,7 +28,6 @@
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
-| M7 | Back/Infra | 🟡 | 🔵 | Rate limit global (`/health` slice ✅; correção/paradas pendente) |
 | M9 | Arch | 🟡 | ⬜ | Chokepoint central de escopo de tenant (pré-req M6) |
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
 | M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
@@ -120,15 +119,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   - **Conexão com M4/M2:** sessão, revogação e rate limit passam a ser por-tenant.
   Item de **planejamento/arquitetura** — produzir um RFC/decisão antes de implementar. Bloqueante para
   a meta de negócio de venda externa.
-
-- 🔵 **M7 — Rate limiting além do login + `/health` como vetor de DoS** *(achado na auditoria 2026-06-24)*
-  Hoje só `POST /api/login` é limitado; o resto é irrestrito. O guard de checklist-por-dia já limita
-  bem o spam de checklist. **`/health` já resolvido** (slice concluído — ver DONE). Falta:
-  - As rotas de correção (A7) são irrestritas — um token de vistoriador comprometido inunda a auditoria
-    append-only.
-  - `addParada` não tem cap (ver **B16**).
-  - **Ação:** rate limiter global por IP/usuário antes de ir a público. Conecta ao store compartilhado
-    do **M2** (o limiter atual é in-memory / single-process).
 
 - ⬜ **M9 — Chokepoint central de escopo de tenant (pré-requisito arquitetural do M6)** *(achado na auditoria 2026-06-24)*
   Hoje `coligada` viaja no JWT mas **nenhuma query escopa por ela** — cada repositório recebe filtros
