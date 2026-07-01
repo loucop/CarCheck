@@ -445,6 +445,20 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
+- 🔵 **M7 (slice `/health`) — `/health` como vetor de DoS de pool** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
+  `GET /api/health` era público, sem auth, e pegava uma conexão do pool (`SELECT 1`) a **cada** chamada —
+  martelar o endpoint esgotava as 10 conexões e derrubava o app (pareia com o fail-fast do **M8**). Fechado
+  em `src/routes/index.js`:
+  - **Cache do resultado** por `HEALTH_CACHE_MS` (env, default 5000). Sob qualquer taxa de request, o pool é
+    tocado no **máx. 1x por janela**, não 1x por request; as demais chamadas servem do cache (mesmo shape de
+    resposta, inclusive nos 503 de banco fora).
+  - **Coalescing anti-thundering-herd:** requests concorrentes no instante da expiração aguardam a **mesma**
+    Promise em voo (`healthInFlight`) em vez de cada um pegar sua própria conexão.
+  - `HEALTH_CACHE_MS` documentado no `.env.example`. Verificado no vivo: 20 requests rápidos → `timestamp`
+    idêntico (pool tocado 1x); após a janela, `timestamp` avança (re-check vivo).
+  - **Resto do M7 segue aberto** (🔵 no `BACKLOG.md`): rate limit das rotas de correção (A7) e cap de
+    `addParada` (**B16**).
+
 - ✅ **M8 — Pool de conexões: `acquireTimeout` + mapeamento 503** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
   Toda request segurava uma conexão do pool (10) por toda a sua vida; sob starvation (~10 leituras lentas
   concorrentes prendendo todas as conexões) a request pendente pendurava indefinidamente à espera de uma

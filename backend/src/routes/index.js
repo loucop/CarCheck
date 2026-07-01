@@ -328,31 +328,64 @@ router.get(
 // HEALTH CHECK (Público)
 // ==========================================
 
-router.get('/health', async (req, res) => {
+// M7: /health é público e sem auth. Sem defesa, cada chamada pega uma conexão do
+// pool (SELECT 1) — martelar o endpoint esgota as 10 conexões e derruba o app.
+// Defesa: cachear o resultado por HEALTH_CACHE_MS (default 5s) e COALESCER checagens
+// concorrentes numa única query em voo. Sob flood, o pool é tocado no máximo 1x por
+// janela (não 1x por request), independente da taxa de chamadas.
+const HEALTH_CACHE_MS = parseInt(process.env.HEALTH_CACHE_MS) || 5000;
+let healthCache = null;    // { statusCode, body, expiresAt }
+let healthInFlight = null; // Promise enquanto uma checagem viva roda (anti-thundering-herd)
+
+async function runHealthCheck() {
     const pool = require('../config/database');
     let conn;
     try {
         conn = await pool.getConnection();
         await conn.query('SELECT 1');
-        
-        res.json({
-            success: true,
-            data: {
-                status: 'online',
-                database: 'connected',
-                timestamp: new Date().toISOString(),
-                version: '4.0.0'
+        return {
+            statusCode: 200,
+            body: {
+                success: true,
+                data: {
+                    status: 'online',
+                    database: 'connected',
+                    timestamp: new Date().toISOString(),
+                    version: '4.0.0'
+                }
             }
-        });
+        };
     } catch (err) {
-        res.status(503).json({
-            success: false,
-            error: 'Banco de dados indisponível',
-            code: 'DB_UNAVAILABLE'
-        });
+        return {
+            statusCode: 503,
+            body: {
+                success: false,
+                error: 'Banco de dados indisponível',
+                code: 'DB_UNAVAILABLE'
+            }
+        };
     } finally {
         if (conn) conn.release();
     }
+}
+
+router.get('/health', async (req, res) => {
+    const now = Date.now();
+    if (healthCache && healthCache.expiresAt > now) {
+        return res.status(healthCache.statusCode).json(healthCache.body);
+    }
+    // Uma só checagem viva por vez: requests concorrentes no momento da expiração
+    // aguardam a mesma Promise em vez de cada um pegar sua própria conexão do pool.
+    if (!healthInFlight) {
+        healthInFlight = runHealthCheck()
+            .then((result) => {
+                healthCache = { ...result, expiresAt: Date.now() + HEALTH_CACHE_MS };
+                return result;
+            })
+            .finally(() => { healthInFlight = null; });
+    }
+    const result = await healthInFlight;
+    res.status(result.statusCode).json(result.body);
 });
 
 module.exports = router;
