@@ -217,7 +217,10 @@ async function finalizarRelatorio(event) {
   };
 
   // M14: guard de double-submit — desabilita o botão pela duração do POST.
-  const restaurarBotao = bloquearBotao(btn, "⏳ Enviando...");
+  // Degrada para no-op se `bloquearBotao` faltar (config.js stale/deploy parcial):
+  // o guard é defense-in-depth; o submit NÃO pode quebrar por causa dele.
+  const restaurarBotao =
+    typeof bloquearBotao === "function" ? bloquearBotao(btn, "⏳ Enviando...") : () => {};
 
   try {
     // M4 Fase 2: cookie httpOnly via apiFetch (Content-Type JSON é padrão);

@@ -10,7 +10,9 @@ document.getElementById("loginForm")?.addEventListener("submit", async (e) => {
 
     // M14: guard de double-submit (login não usa apiFetch — ver obs. no config.js).
     const btnSubmit = e.target.querySelector('button[type="submit"]');
-    const restaurarBotao = bloquearBotao(btnSubmit, "⏳ Entrando...");
+    // Degrada para no-op se `bloquearBotao` faltar (config.js stale/deploy parcial).
+    const restaurarBotao =
+      typeof bloquearBotao === "function" ? bloquearBotao(btnSubmit, "⏳ Entrando...") : () => {};
 
     // M14: timeout via AbortController — sem isto um login em rede móvel travada
     // pendura para sempre, sem feedback.

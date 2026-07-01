@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BDV - Boletim Diário de Veículo</title>
-    <link rel="stylesheet" href="../css/style.css" />
+    <link rel="stylesheet" href="../css/style.css?v=20260701" />
     <style>
       .veiculo-badge {
         background: #0f172a;
@@ -419,7 +419,7 @@
       </div>
     </div>
 
-    <script src="../js/config.js"></script>
+    <script src="../js/config.js?v=20260701"></script>
     <script>
       let bdvAtivo = null;
       let paradaEmFechamento = null;
@@ -643,7 +643,8 @@
         if (!coligada)  { alert('Selecione a coligada.'); return; }
 
         // M14: guard de double-submit.
-        const restaurarBotao = bloquearBotao(btn, '⏳ Iniciando...');
+        const restaurarBotao =
+          typeof bloquearBotao === 'function' ? bloquearBotao(btn, '⏳ Iniciando...') : () => {};
         try {
           const res = await apiFetch('/bdv', {
             method: 'POST',
@@ -706,7 +707,8 @@
 
         // M14: guard de double-submit — paradas não têm guard de banco (linhas
         // duplicadas), então o bloqueio na UI é a única defesa contra o toque duplo.
-        const restaurarBotao = bloquearBotao(btn, '⏳ Salvando...');
+        const restaurarBotao =
+          typeof bloquearBotao === 'function' ? bloquearBotao(btn, '⏳ Salvando...') : () => {};
         try {
           const res = await apiFetch(`/bdv/${bdvAtivo.id}/paradas`, {
             method: 'POST',
@@ -760,7 +762,8 @@
         if (!horaChegada)  { alert('Informe a hora de chegada.'); return; }
 
         // M14: guard de double-submit.
-        const restaurarBotao = bloquearBotao(btn, '⏳ Salvando...');
+        const restaurarBotao =
+          typeof bloquearBotao === 'function' ? bloquearBotao(btn, '⏳ Salvando...') : () => {};
         try {
           const res = await apiFetch(`/bdv/${bdvAtivo.id}/paradas/${paradaEmFechamento}`, {
             method: 'PATCH',
@@ -816,7 +819,8 @@
         if (!confirm('Confirmar encerramento da viagem?')) return;
 
         // M14: guard de double-submit.
-        const restaurarBotao = bloquearBotao(btn, '⏳ Encerrando...');
+        const restaurarBotao =
+          typeof bloquearBotao === 'function' ? bloquearBotao(btn, '⏳ Encerrando...') : () => {};
         try {
           const res = await apiFetch(`/bdv/${bdvAtivo.id}/encerrar`, {
             method: 'PATCH',
