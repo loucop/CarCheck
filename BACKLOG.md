@@ -34,12 +34,10 @@
 | M9 | Arch | 🟡 | ⬜ | Chokepoint central de escopo de tenant (pré-req M6) |
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
 | M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
-| M14 | Front | 🟡 | ⬜ | Resiliência móvel (timeout + guard de double-submit) |
 | M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
 | B2 | Back | 🟢 | ⬜ | Política de senha mais forte |
 | B3 | Back | 🟢 | ⬜ | Limite de payload (rever se ainda distinto vs A4) |
 | B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
-| B7 | Front | 🟢 | 🔵 | XSS nas telas do motorista (2 fixes: frota.js, bdv.html) |
 | M1-b | Front | 🟢 | ⬜ | Handlers inline `on*=` → `addEventListener` (sub-M1) |
 | M1-c | Front | 🟢 | ⬜ | Estilos inline → CSS (sub-M1) |
 | B8 | Infra | 🟢 | ⛔ | NSSM serviço Windows (config ✅; instalação exige admin) |
@@ -197,22 +195,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     (`unique(veiculo_id)`, `unique(matricula)`) escrita na mesma transação. Hoje a serialização por
     `FOR UPDATE` é adequada; revisitar se surgir um segundo caminho de escrita.
 
-- ⬜ **M14 — Resiliência de conexão em rede móvel (timeout + feedback + guard de double-submit)** *(auditoria mobile 2026-06-24)*
-  O produto é usado por motoristas em campo, em celular, com cobertura instável — mas o cliente assume
-  rede confiável. Lacunas:
-  - **Sem timeout / `AbortController`:** todo `fetch`/`apiFetch` espera indefinidamente. Numa conexão
-    móvel que trava (túnel, elevador, zona morta) a request **pendura para sempre**, sem feedback — o
-    motorista não sabe se enviou. **Correção:** envolver as chamadas com `AbortController` + timeout
-    (ex.: 15–20 s) e mensagem de "rede lenta, tente de novo".
-  - **Sem guard de submissão em voo (double-submit):** `finalizarRelatorio` (checklist), `iniciarViagem`
-    (abrir BDV), `addParada`/`closeParada` **não desabilitam o botão** durante o POST. Numa rede lenta o
-    motorista toca de novo achando que não funcionou → **request duplicado**. Os guards de banco pegam
-    checklist/BDV duplicado (409, mas com `alert` confuso); **paradas NÃO têm guard** (linhas
-    duplicadas — liga ao TOCTOU do **M10**). **Correção:** desabilitar o botão no submit + reabilitar no
-    fim/erro (padrão idempotente de UX).
-  - Liga-se a **M8** (upload lento de 1 MB segura uma conexão do pool pela transferência inteira; payload
-    real é pequeno por causa do canvas 600×300, então risco baixo hoje).
-
 - ⬜ **M15 — Sem capacidade offline / fila de submissão (campo com cobertura instável)** *(auditoria mobile 2026-06-24)*
   Não há service worker, `navigator.onLine`, retry, nem fila de submissão. Um checklist/parada enviado
   numa conexão que cai é **simplesmente perdido** — o `fetch` rejeita, exibe `alert` e o motorista
@@ -243,29 +225,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
 - ⬜ **B5 — Sem testes automatizados**
   Projeto não possui testes (decisão atual). Caso evolua, priorizar testes dos serviços
   transacionais (`checklist.service`, `bdv.service` — locks `FOR UPDATE`, validação de KM).
-
-- 🔵 **B7 — Auditar XSS nas telas do motorista** *(auditado 2026-06-24; 2 correções pendentes)*
-  A auditoria de A1 cobriu apenas as páginas admin. Revisão dos sinks de `innerHTML` no lado motorista
-  (`frota.js`, `checklist.js`, `bdv.html`) concluída em 2026-06-24:
-  - ⬜ **`frota.js` (Médio — corrigir):** `carregarVeiculos` monta os cards com `innerHTML +=`
-    interpolando `v.modelo`/`v.placa`/`v.id` **sem escape**, tanto no texto HTML (`<h3>${v.modelo}</h3>`)
-    quanto **dentro de um atributo `onclick` com aspas simples**
-    (`onclick="iniciarChecklist('${v.id}', '${v.placa}', '${tipoVeiculo}', '${v.modelo}')"`). Um `'` ou
-    `<` no `modelo`/`placa` quebra a string JS do atributo → injeção de JS arbitrário (a aresta mais
-    afiada). Fonte hoje é admin/inserção manual no banco (risco menor), mas **escala para alto** na meta
-    multi-tenant/pública (M6/M9), onde dados de veículo podem ser preenchidos pelo cliente.
-    **Correção:** escapar via helper **e** trocar o `onclick` inline por `addEventListener` + `data-*`
-    (passa os valores por `dataset`, sem interpolar em string de atributo) — também remove um handler
-    inline (alinha com **M1-b**, rumo a CSP estrito).
-  - ⬜ **`bdv.html` (Baixo — defense-in-depth):** `renderizarParadas` escapa os campos de texto
-    (`escHtml` em `local_saida`/`local_chegada`/`observacao` ✓), mas `formatarData` **retorna a string
-    crua** quando a entrada não é data (`if (isNaN(d)) return str;`) e `${p.km}` é interpolado **cru**.
-    Difícil de alcançar (servidor valida `hora_*` por `DATETIME_RE` e `km` como número), mas escapar o
-    fallback de `formatarData` fecha o mesmo padrão já apontado no A1 (versão admin de `formatarData`).
-  - ✅ **`checklist.js` (limpo):** o único sink de `innerHTML` (`renderizarItens`) interpola o array
-    **constante** `itensChecklist` (hardcoded no arquivo), não dado de servidor/usuário. Sem vetor.
-  - Observação: `escHtml` (bdv.html) escapa `& < >` mas **não** aspas — adequado para contexto de texto
-    entre tags (onde é usado), insuficiente se algum dia for usado dentro de valor de atributo.
 
 - ⬜ **M1-b — Converter handlers inline `on*=` para `addEventListener`** *(sub-item de M1)*
   Para chegar a `script-src 'self'` sem `'unsafe-inline'`/`script-src-attr`, eliminar os ~19
@@ -429,4 +388,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, M10, M13, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M10, M13, M14, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.

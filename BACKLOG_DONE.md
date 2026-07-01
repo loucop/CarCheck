@@ -423,6 +423,21 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
+- ✅ **M14 — Resiliência de conexão em rede móvel (timeout + guard de double-submit)** *(concluído em 2026-07-01; deployado e testado)*
+  Motoristas em campo, em celular com cobertura instável — o cliente assumia rede confiável. Duas lacunas fechadas:
+  - **Timeout de request (fim do hang infinito):** `apiFetch` (`config.js`) agora roda sob `AbortController`
+    com teto de 20 s (`opts.timeoutMs` sobrescrevível). No estouro, lança Error com `isTimeout === true` e
+    mensagem amigável ("conexão lenta ou instável…"); os chamadores exibem `err.message` no lugar do erro
+    genérico. Cobre checklist, abrir/encerrar BDV, paradas e todos os GETs admin de graça. O login (`auth.js`,
+    raw `fetch`) ganhou o mesmo `AbortController` à parte.
+  - **Guard de double-submit:** novo helper compartilhado `bloquearBotao(btn, texto)` em `config.js` —
+    desabilita o botão + troca o rótulo por "⏳ …" durante o POST, retorna uma fn de restauração chamada no
+    `finally`. Ligado em `finalizarRelatorio`, `iniciarViagem`, `salvarParada`, `salvarChegada`,
+    `encerrarViagem` e no login. **Paradas não têm dedup no banco**, então o bloqueio na UI é a única defesa
+    contra a linha duplicada do toque-duplo (liga ao TOCTOU do M10).
+  - Arquivos (frontend-only): `config.js`, `auth.js`, `checklist.js`, `bdv.html` (4 handlers + os 4
+    `onclick="…(this)"`). `checklist.html` já passava `event`. Verificado com throttling do DevTools.
+
 - ✅ **M10 — TOCTOU em `closeBDV` / paradas (re-lock dentro da transação)** *(concluído em 2026-06-30; verificado no servidor vivo)*
   `addParada`/`closeParada` rodavam **sem transação e sem row-lock**, e `closeBDV` checava o status do BDV
   **fora** da transação (travava só o veículo) — dois requests concorrentes (double-tap/retry) podiam ambos
@@ -561,6 +576,21 @@ removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN).
 ---
 
 ## 🟢 Baixo — concluído
+
+- ✅ **B7 — XSS nas telas do motorista** *(concluído em 2026-07-01; deployado e testado)*
+  A auditoria de A1 cobriu só as páginas admin; esta fechou os sinks do lado motorista (auditados 2026-06-24):
+  - **`frota.js` (era a aresta afiada):** os cards eram montados com `innerHTML +=` interpolando
+    `v.modelo`/`v.placa`/`v.id` crus **no texto HTML** e, pior, **dentro de `onclick="iniciarChecklist('${v.id}', …)"`
+    com aspas simples** — um `'`/`<` no modelo/placa quebrava a string JS do atributo → JS arbitrário.
+    Reescrito com `createElement` + `textContent` + `addEventListener` (nada é parseado como HTML/JS);
+    remove também um handler inline (alinha ao M1-b).
+  - **`bdv.html`:** `renderizarParadas` escapava os campos de texto, mas `formatarData` devolvia a entrada
+    **crua** no fallback não-data e `${p.km}` era interpolado cru, ambos em `innerHTML`. Escapado o fallback de
+    `formatarData` e `km` via `escHtml(String(...))`. Difícil de alcançar (servidor valida `hora_*`/`km`), mas
+    fecha o mesmo padrão do A1.
+  - **`checklist.js` (já limpo):** o único sink de `innerHTML` interpola o array **constante** `itensChecklist`
+    (hardcoded), não dado de servidor/usuário. Sem vetor.
+  - Arquivos (frontend-only): `frota.js`, `bdv.html`.
 
 - ✅ **B1 — Remover `console.log` de debug remanescentes** *(concluído em 2026-06-30)*
   Removidos os `console.log` de debug do frontend, mantendo `console.error`/`console.warn` (log legítimo de
