@@ -40,6 +40,17 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
+    // M8: pool esgotado — a espera por conexão livre estourou o acquireTimeout.
+    // NÃO é falha do banco: é sobrecarga transitória. Deve vir ANTES do branch
+    // genérico ER_ (o code também começa com 'ER_') e retornar 503, não 500.
+    if (err.code === 'ER_GET_CONNECTION_TIMEOUT') {
+        return res.status(503).json({
+            success: false,
+            error: 'Serviço temporariamente indisponível, tente novamente',
+            code: ERROR_CODES.SERVICE_UNAVAILABLE
+        });
+    }
+
     // Erro genérico de banco
     if (err.code && err.code.startsWith('ER_')) {
         return res.status(500).json({

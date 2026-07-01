@@ -445,6 +445,21 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
+- ✅ **M8 — Pool de conexões: `acquireTimeout` + mapeamento 503** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
+  Toda request segurava uma conexão do pool (10) por toda a sua vida; sob starvation (~10 leituras lentas
+  concorrentes prendendo todas as conexões) a request pendente pendurava indefinidamente à espera de uma
+  conexão livre — o **A11** (base64 fora das listas) já reduziu o tempo que cada conexão fica presa, mas
+  faltava o teto de espera. Fechado:
+  - **`acquireTimeout` no pool** (`config/database.js`): teto configurável via `DB_ACQUIRE_TIMEOUT`
+    (default 10000 ms). Falha rápida com `ER_GET_CONNECTION_TIMEOUT` em vez de enfileirar a request.
+  - **Mapeamento 503** (`errorHandler.middleware.js`): novo branch para `ER_GET_CONNECTION_TIMEOUT` →
+    `503 SERVICE_UNAVAILABLE`, posicionado **antes** do branch genérico `ER_` (o code também começa com
+    `ER_`) para não cair em `500 DB_ERROR`. Sobrecarga transitória ≠ falha do banco.
+  - Novo `ERROR_CODES.SERVICE_UNAVAILABLE` (`utils/constants.js`); `DB_ACQUIRE_TIMEOUT` documentado no
+    `.env.example`. Verificado: boot limpo com a nova opção do pool + smoke test (login + leitura autenticada)
+    sem regressão. O caminho 503 é provado por construção (ordem dos branches + code confirmado) — saturar as
+    10 conexões no servidor vivo não vale o risco.
+
 - ✅ **M14 — Resiliência de conexão em rede móvel (timeout + guard de double-submit)** *(concluído em 2026-07-01; deployado e testado)*
   Motoristas em campo, em celular com cobertura instável — o cliente assumia rede confiável. Duas lacunas fechadas:
   - **Timeout de request (fim do hang infinito):** `apiFetch` (`config.js`) agora roda sob `AbortController`

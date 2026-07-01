@@ -10,6 +10,11 @@ const pool = mariadb.createPool({
     database: process.env.DB_NAME,
     port: parseInt(process.env.DB_PORT),
     connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT),
+    // M8: limita a espera por uma conexão livre do pool. Sem isto, sob starvation
+    // (todas as N conexões presas por leituras lentas) a request pendura até uma
+    // liberar — falha rápida com ER_GET_CONNECTION_TIMEOUT é melhor que enfileirar
+    // indefinidamente. O errorHandler mapeia esse code para 503 (SERVICE_UNAVAILABLE).
+    acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 10000,
     allowPublicKeyRetrieval: true,
     trace: process.env.NODE_ENV !== 'production'
 });

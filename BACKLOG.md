@@ -29,7 +29,6 @@
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
 | M7 | Back/Infra | 🟡 | ⬜ | Rate limit global + `/health` como vetor de DoS |
-| M8 | Back/DB | 🟡 | ⬜ | Pool: `acquireTimeout` + teto de starvation |
 | M9 | Arch | 🟡 | ⬜ | Chokepoint central de escopo de tenant (pré-req M6) |
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
 | M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
@@ -133,14 +132,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   - `addParada` não tem cap (ver **B16**).
   - **Ação:** rate limiter global por IP/usuário antes de ir a público. Conecta ao store compartilhado
     do **M2** (o limiter atual é in-memory / single-process).
-
-- ⬜ **M8 — Pool de conexões: `acquireTimeout` + teto de starvation** *(achado na auditoria 2026-06-24)*
-  Toda request segura uma conexão do pool (10) por toda a sua vida; queries de relatório (esp. com
-  base64, ver **A11**) seguram a sua pela transferência inteira. ~10 leituras lentas concorrentes
-  travam todas as escritas. O limiter in-memory do **M2** já prende o deploy a **single-process**,
-  então não dá para escalar horizontalmente para escapar disto — o caminho é baratear a query.
-  - **Ação:** definir `acquireTimeout` no pool (falha rápida em vez de pendurar a request); o **A11**
-    (base64 fora das listas, **concluído**) já reduziu o tempo que cada conexão fica presa.
 
 - ⬜ **M9 — Chokepoint central de escopo de tenant (pré-requisito arquitetural do M6)** *(achado na auditoria 2026-06-24)*
   Hoje `coligada` viaja no JWT mas **nenhuma query escopa por ela** — cada repositório recebe filtros
