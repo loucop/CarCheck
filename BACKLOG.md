@@ -30,7 +30,6 @@
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
 | M9 | Arch | 🟡 | ⬜ | Chokepoint central de escopo de tenant (pré-req M6) |
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
-| M12 | DB | 🟡 | ⬜ | Invariantes no nível do banco (CHECK/unique) |
 | M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
 | B3 | Back | 🟢 | ⬜ | Limite de payload (rever se ainda distinto vs A4) |
 | B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
@@ -135,15 +134,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     sinalize qualquer veículo onde `km_atual ≠ MAX(último checklist km_entrada, último BDV encerrado
     km_final)`. **Detecção, não auto-correção** — preserva o princípio §6.2 de "âncora é sempre decisão
     explícita". O helper de recompute já existe.
-
-- ⬜ **M12 — Invariantes no nível do banco (defense-in-depth)** *(achado na auditoria 2026-06-24)*
-  Toda regra vive em código de app; uma escrita direta no banco, um segundo escritor futuro ou um bug
-  fura tudo. Adicionar invariantes no schema (MariaDB 10.4 impõe):
-  - `CHECK (km_atual >= 0)`, `CHECK (km_entrada >= 0)`, etc.
-  - "Um BDV aberto por veículo / por motorista" é imposto só por lógica de app + `FOR UPDATE`. O MariaDB
-    não tem índice único filtrado, mas dá para garantir com uma tabela pequena `bdv_ativos`
-    (`unique(veiculo_id)`, `unique(matricula)`) escrita na mesma transação. Hoje a serialização por
-    `FOR UPDATE` é adequada; revisitar se surgir um segundo caminho de escrita.
 
 - ⬜ **M15 — Sem capacidade offline / fila de submissão (campo com cobertura instável)** *(auditoria mobile 2026-06-24)*
   Não há service worker, `navigator.onLine`, retry, nem fila de submissão. Um checklist/parada enviado

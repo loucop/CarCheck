@@ -445,6 +445,23 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
+- ✅ **M12 — Invariantes de KM no nível do banco (defense-in-depth)** *(concluído em 2026-07-01; DDL aplicado no banco vivo)*
+  Toda regra de KM vivia só no código (Zod); uma escrita direta / futuro segundo escritor / bug furava tudo.
+  Adicionados CHECK constraints (MariaDB 10.4 impõe) — aplicados no vivo, **todos os ALTER passaram sem erro**
+  (⇒ dados existentes conformam):
+  ```sql
+  ALTER TABLE veiculos    ADD CONSTRAINT chk_veiculos_km_atual    CHECK (km_atual >= 0);
+  ALTER TABLE checklists  ADD CONSTRAINT chk_checklists_km_entrada CHECK (km_entrada >= 0);
+  ALTER TABLE bdv         ADD CONSTRAINT chk_bdv_km_inicial        CHECK (km_inicial >= 0);
+  ALTER TABLE bdv         ADD CONSTRAINT chk_bdv_km_final          CHECK (km_final IS NULL OR km_final >= 0);
+  ALTER TABLE bdv_paradas ADD CONSTRAINT chk_paradas_km           CHECK (km IS NULL OR km >= 0);
+  ALTER TABLE bdv         ADD CONSTRAINT chk_bdv_km_final_ge_inicial CHECK (km_final IS NULL OR km_final >= km_inicial);
+  ```
+  A última (cross-column, opcional) também passou → nenhuma correção deixou `km_final < km_inicial`.
+  Registrado aqui porque não há `schema.sql` versionado (ver **B17**).
+  - **Deliberadamente FORA:** "um BDV aberto por veículo/motorista" via `unique` — o `FOR UPDATE` já serializa
+    (ver **M10**); exigiria tabela `bdv_ativos`. Revisitar só se surgir um segundo caminho de escrita.
+
 - ✅ **M7 — Rate limiting além do login + `/health` como vetor de DoS** *(concluído em 2026-07-01; deployado e testado no servidor vivo, em duas fatias)*
   Só `POST /api/login` era limitado; o resto era irrestrito, e `/health` esgotava o pool. Fechado:
   - **Fatia `/health` (`src/routes/index.js`):** era público, sem auth, e pegava uma conexão do pool
