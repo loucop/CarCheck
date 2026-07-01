@@ -248,7 +248,7 @@
           </select>
         </div>
 
-        <button class="btn-green" onclick="iniciarViagem()" style="margin-top: 10px;">
+        <button class="btn-green" onclick="iniciarViagem(this)" style="margin-top: 10px;">
           ▶ INICIAR VIAGEM
         </button>
       </div>
@@ -322,7 +322,7 @@
           <input type="text" id="obs-parada" placeholder="Opcional" />
         </div>
 
-        <button onclick="salvarParada()" class="btn-blue" style="margin-bottom: 0;">
+        <button onclick="salvarParada(this)" class="btn-blue" style="margin-bottom: 0;">
           SALVAR PARADA
         </button>
         <button class="btn-secondary" onclick="fecharModalParada()">Cancelar</button>
@@ -354,7 +354,7 @@
           <input type="text" id="chegada-obs" placeholder="Opcional" />
         </div>
 
-        <button onclick="salvarChegada()" style="
+        <button onclick="salvarChegada(this)" style="
           background: #f59e0b;
           width: 100%;
           padding: 18px;
@@ -412,7 +412,7 @@
           </label>
         </div>
 
-        <button class="btn-red" onclick="encerrarViagem()" style="margin-top: 10px;">
+        <button class="btn-red" onclick="encerrarViagem(this)" style="margin-top: 10px;">
           ■ CONFIRMAR ENCERRAMENTO
         </button>
         <button class="btn-secondary" onclick="fecharModalEncerrar()">Cancelar</button>
@@ -629,7 +629,7 @@
       }
 
       // ─── API: Abrir BDV ────────────────────────────────────────────
-      async function iniciarViagem() {
+      async function iniciarViagem(btn) {
         const kmInicial  = document.getElementById('km-inicial').value.trim();
         const coligada   = document.getElementById('coligada').value;
         const veiculoId  = parseInt(localStorage.getItem('veiculo_id'));
@@ -642,6 +642,8 @@
         if (!kmInicial) { alert('Informe o KM inicial.'); return; }
         if (!coligada)  { alert('Selecione a coligada.'); return; }
 
+        // M14: guard de double-submit.
+        const restaurarBotao = bloquearBotao(btn, '⏳ Iniciando...');
         try {
           const res = await apiFetch('/bdv', {
             method: 'POST',
@@ -671,7 +673,9 @@
         } catch (err) {
           if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao iniciar viagem:', err);
-          alert('Erro de comunicação com o servidor.');
+          alert(err && err.isTimeout ? err.message : 'Erro de comunicação com o servidor.');
+        } finally {
+          restaurarBotao();
         }
       }
 
@@ -689,7 +693,7 @@
       }
       function fecharModalParada() { fecharModal('modal-parada'); }
 
-      async function salvarParada() {
+      async function salvarParada(btn) {
         const localSaida   = document.getElementById('local-saida').value.trim();
         const horaSaida    = document.getElementById('hora-saida').value;
         const km           = document.getElementById('km-parada').value.trim();
@@ -700,6 +704,9 @@
         if (!horaSaida)  { alert('Informe a hora de saída.'); return; }
         if (!km)         { alert('Informe o KM atual.'); return; }
 
+        // M14: guard de double-submit — paradas não têm guard de banco (linhas
+        // duplicadas), então o bloqueio na UI é a única defesa contra o toque duplo.
+        const restaurarBotao = bloquearBotao(btn, '⏳ Salvando...');
         try {
           const res = await apiFetch(`/bdv/${bdvAtivo.id}/paradas`, {
             method: 'POST',
@@ -723,7 +730,9 @@
         } catch (err) {
           if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao salvar parada:', err);
-          alert('Erro de comunicação com o servidor.');
+          alert(err && err.isTimeout ? err.message : 'Erro de comunicação com o servidor.');
+        } finally {
+          restaurarBotao();
         }
       }
 
@@ -741,7 +750,7 @@
         fecharModal('modal-chegada');
       }
 
-      async function salvarChegada() {
+      async function salvarChegada(btn) {
         const localChegada = document.getElementById('chegada-local').value.trim();
         const horaChegada  = document.getElementById('chegada-hora').value;
         const km           = document.getElementById('chegada-km').value;
@@ -750,6 +759,8 @@
         if (!localChegada) { alert('Informe o local de chegada.'); return; }
         if (!horaChegada)  { alert('Informe a hora de chegada.'); return; }
 
+        // M14: guard de double-submit.
+        const restaurarBotao = bloquearBotao(btn, '⏳ Salvando...');
         try {
           const res = await apiFetch(`/bdv/${bdvAtivo.id}/paradas/${paradaEmFechamento}`, {
             method: 'PATCH',
@@ -772,7 +783,9 @@
         } catch (err) {
           if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao registrar chegada:', err);
-          alert('Erro de comunicação com o servidor.');
+          alert(err && err.isTimeout ? err.message : 'Erro de comunicação com o servidor.');
+        } finally {
+          restaurarBotao();
         }
       }
 
@@ -787,7 +800,7 @@
       }
       function fecharModalEncerrar() { fecharModal('modal-encerrar'); }
 
-      async function encerrarViagem() {
+      async function encerrarViagem(btn) {
         if (!bdvAtivo) {
           window.location.replace('menu.html');
           return;
@@ -802,6 +815,8 @@
 
         if (!confirm('Confirmar encerramento da viagem?')) return;
 
+        // M14: guard de double-submit.
+        const restaurarBotao = bloquearBotao(btn, '⏳ Encerrando...');
         try {
           const res = await apiFetch(`/bdv/${bdvAtivo.id}/encerrar`, {
             method: 'PATCH',
@@ -824,7 +839,9 @@
         } catch (err) {
           if (err && err.isAuthRedirect) return;
           console.error('[BDV] Erro ao encerrar viagem:', err);
-          alert('Erro de comunicação com o servidor.');
+          alert(err && err.isTimeout ? err.message : 'Erro de comunicação com o servidor.');
+        } finally {
+          restaurarBotao();
         }
       }
 

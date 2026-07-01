@@ -164,6 +164,10 @@ function inicializarPagina() {
 async function finalizarRelatorio(event) {
   if (event) event.preventDefault();
 
+  // M14: captura o botão ANTES do 1º await (o browser zera currentTarget depois)
+  // p/ o guard de double-submit.
+  const btn = event && event.currentTarget;
+
   // M4 Fase 2: guard por presença de `usuario`; a sessão real vive no cookie.
   if (!localStorage.getItem("usuario")) {
     alert("Sessão expirada. Faça login novamente.");
@@ -212,6 +216,9 @@ async function finalizarRelatorio(event) {
     mapa_avaria_base64: canvasData,
   };
 
+  // M14: guard de double-submit — desabilita o botão pela duração do POST.
+  const restaurarBotao = bloquearBotao(btn, "⏳ Enviando...");
+
   try {
     // M4 Fase 2: cookie httpOnly via apiFetch (Content-Type JSON é padrão);
     // 401 é tratado centralmente por apiFetch (limpa estado + redireciona).
@@ -236,7 +243,11 @@ async function finalizarRelatorio(event) {
     // 401 já tratado por apiFetch (redirect ao login em curso) — não alertar.
     if (erro && erro.isAuthRedirect) return;
     console.error("Erro de rede:", erro);
-    alert("❌ Erro de comunicação com o servidor.");
+    // M14: mensagem específica de timeout ("rede lenta") vs. erro genérico.
+    alert(erro && erro.isTimeout ? `❌ ${erro.message}` : "❌ Erro de comunicação com o servidor.");
+  } finally {
+    // M14: reabilita o botão (idempotente; no sucesso a página já navegou).
+    restaurarBotao();
   }
 }
 
