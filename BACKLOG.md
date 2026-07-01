@@ -9,7 +9,7 @@
 > **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** (referência, raramente carregado). Os 🔵 abaixo
 > trazem **só o que falta** — o histórico completo está no DONE.
 >
-> 🚀 **Roadmap de produto/go-to-market** (pós-produção — o que fazer depois do app estável)
+> 🚀 **Roadmap técnico de produtização** (pós-produção — o que fazer depois do app estável)
 > vive em **[`ROADMAP.md`](ROADMAP.md)**. Este backlog é o trabalho de *agora*; o roadmap é o *depois*.
 >
 > **Nota:** a numeração de segurança chegou até **S3** (todos concluídos → DONE). Se existiam
