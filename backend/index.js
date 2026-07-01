@@ -1,5 +1,6 @@
 ﻿const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
@@ -34,6 +35,13 @@ BigInt.prototype.toJSON = function() {
 // ==========================================
 // MIDDLEWARES GLOBAIS
 // ==========================================
+
+// B22: compressão gzip/brotli das respostas. Relatórios admin e o histórico
+// retornam JSON grande (checklists com itens_status, listas de BDV) — comprimir
+// corta banda e latência em rede móvel. Nota: app roda em HTTP na LAN; ao ir a
+// HTTPS público, o JWT vive em cookie httpOnly (não é refletido no corpo), então
+// o vetor BREACH é baixo. Revisitar se dados sensíveis passarem a ecoar no body.
+app.use(compression());
 
 // ------------------------------------------
 // SECURITY HEADERS (helmet) + CSP
@@ -208,7 +216,7 @@ if (!JWT_SECRET || WEAK_DEFAULTS.includes(JWT_SECRET) || JWT_SECRET.length < 32)
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
     const sep = '='.repeat(60);
     logger.info(
         '\n' + sep +
@@ -224,18 +232,42 @@ app.listen(PORT, HOST, () => {
 });
 
 // ==========================================
-// GRACEFUL SHUTDOWN
+// GRACEFUL SHUTDOWN (B18)
 // ==========================================
+// Antes: os handlers faziam process.exit(0) na hora — matavam requests em voo e
+// deixavam as conexões do pool penduradas (o MariaDB só as coletava no timeout).
+// Agora: para de aceitar conexões novas, deixa as em andamento drenarem, então
+// fecha o pool (pool.end()) antes de sair. Fallback força a saída se algo travar.
 
-process.on('SIGTERM', () => {
-    logger.info('[SHUTDOWN] Encerrando servidor...');
-    process.exit(0);
-});
+const pool = require('./src/config/database');
+let encerrando = false;
 
-process.on('SIGINT', () => {
-    logger.info('[SHUTDOWN] Encerrando servidor...');
-    process.exit(0);
-});
+async function gracefulShutdown(signal) {
+    if (encerrando) return; // ignora sinais repetidos
+    encerrando = true;
+    logger.info(`[SHUTDOWN] ${signal} recebido — encerrando graciosamente...`);
+
+    // Rede de segurança: se o close/drain travar, não fica pendurado para sempre.
+    const forceExit = setTimeout(() => {
+        logger.error('[SHUTDOWN] Timeout no encerramento — forçando saída.');
+        process.exit(1);
+    }, 10000);
+    forceExit.unref();
+
+    server.close(async () => {
+        try {
+            await pool.end(); // drena o pool do MariaDB
+            logger.info('[SHUTDOWN] Servidor e pool encerrados. Até logo.');
+            process.exit(0);
+        } catch (err) {
+            logger.error('[SHUTDOWN] Erro ao encerrar o pool', err);
+            process.exit(1);
+        }
+    });
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 process.on('unhandledRejection', (reason, promise) => {
     logger.error('[ERRO NÃO TRATADO]', { reason, promise });

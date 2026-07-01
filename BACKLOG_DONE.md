@@ -645,6 +645,21 @@ removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN).
   `BDV_MAX_PARADAS` (env, default 200). Verificado por construção (contagem sob lock + threshold) + boot limpo;
   prova do 409 disponível baixando o teto via env sob demanda.
 
+- ✅ **B18 — Drain do pool no shutdown gracioso** *(concluído em 2026-07-01; deployado)*
+  SIGTERM/SIGINT faziam `process.exit(0)` na hora — matavam requests em voo e deixavam as conexões do pool
+  penduradas. Agora (`index.js`): captura o `server` do `app.listen`, no sinal para de aceitar conexões
+  (`server.close`), deixa as em andamento drenarem, fecha o pool (`pool.end()`) e sai; timeout de 10s
+  (`unref`) força a saída se o drain travar, e um flag `encerrando` ignora sinais repetidos. Não é
+  curl-testável — verificado por boot limpo (server/shutdown novos carregam) + log `[SHUTDOWN] … pool
+  encerrados` no restart.
+
+- ✅ **B22 — Compressão gzip/brotli no backend** *(concluído em 2026-07-01; deployado e testado no servidor vivo)*
+  Não havia middleware de compressão — JSON trafegava cru, caro em rede móvel (relatórios admin com
+  `mapa_avaria_base64` são grandes e base64 é altamente compressível). Adicionado `compression()`
+  (dep `compression` no `package.json`) cedo na cadeia do `index.js`. Verificado no vivo: relatório admin
+  **111.432 → 2.454 bytes** no fio (`Content-Encoding: br`, ~45×). Nota BREACH: app em HTTP/LAN; o JWT vive
+  em cookie httpOnly (não ecoa no corpo), então o vetor é baixo ao ir a HTTPS.
+
 - ✅ **B7 — XSS nas telas do motorista** *(concluído em 2026-07-01; deployado e testado)*
   A auditoria de A1 cobriu só as páginas admin; esta fechou os sinks do lado motorista (auditados 2026-06-24):
   - **`frota.js` (era a aresta afiada):** os cards eram montados com `innerHTML +=` interpolando

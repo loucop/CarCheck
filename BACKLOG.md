@@ -45,10 +45,8 @@
 | B14 | DB/Infra | 🟢 | ⬜ | Estratégia de retenção / particionamento |
 | B15 | DB | 🟢 | ⬜ | `itens_status` JSON opaco em coluna TEXT |
 | B17 | DB/Infra | 🟢 | ⬜ | Versionar `schema.sql` no repo (pré-req B10/M9) |
-| B18 | Back | 🟢 | ⬜ | Drain do pool no shutdown gracioso |
 | B19 | Back/Infra | 🟢 | ⬜ | TLS no banco + remover `allowPublicKeyRetrieval` |
 | B20 | DB | 🟢 | ⬜ | Verificar que `auto_increment` é `BIGINT` (checup único) |
-| B22 | Back | 🟢 | ⬜ | Sem compressão (gzip/brotli) no backend |
 | B24 | Front | 🟢 | ⬜ | Atributos de teclado mobile nos inputs |
 | I1 | Infra | 🔴 | ⬜ | Windows Server 2012 fora de suporte (bloqueia público) |
 | Deploy | Infra | — | ⬜ | Checklist de produção (HTTPS, CORS, CSP, HSTS, trust proxy) |
@@ -264,10 +262,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   perda do banco + deploy manual = reconstrução de memória. No mínimo, commitar um snapshot `schema.sql`
   agora. Pré-requisito do **B10** e do **M9** (sync de schema entre tenants).
 
-- ⬜ **B18 — Drain do pool no shutdown gracioso** *(achado na auditoria 2026-06-24)*
-  SIGTERM/SIGINT fazem `process.exit(0)` sem drenar o pool — transações em voo são abandonadas. Menor;
-  adicionar `pool.end()` + drain curto quando o wrapper de serviço (**B8**) entrar.
-
 - ⬜ **B19 — `allowPublicKeyRetrieval: true` + TLS no banco** *(achado na auditoria 2026-06-24)*
   Inócuo num banco localhost/LAN, mas se o MariaDB for para um host separado/gerenciado, essa flag +
   conexão sem TLS é vetor de MITM/disclosure de credencial. Usar conexão TLS ao banco e remover a flag
@@ -281,13 +275,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND EXTRA = 'auto_increment';
   ```
-
-- ⬜ **B22 — Sem compressão (gzip/brotli) no backend** *(auditoria mobile 2026-06-24)*
-  Nenhum middleware de compressão (sem dep `compression`). JSON trafega cru — caro em rede móvel,
-  sobretudo relatórios com `mapa_avaria_base64` (base64 é altamente compressível, ~30–40% com gzip).
-  Payloads do motorista são pequenos; o ganho maior é nos relatórios admin. Mitigado em parte quando
-  o Cloudflare entrar (comprime no edge), mas `compression()` no Express é um ganho barato já na LAN.
-  Relaciona-se a **A11** (**concluído** — base64 já não trafega nas listas).
 
 - ⬜ **B24 — Atributos de teclado mobile nos inputs** *(auditoria mobile 2026-06-24)*
   Os inputs **críticos do motorista já estão certos** (`km` = `type=number` → teclado numérico;
