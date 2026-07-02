@@ -6,3 +6,4 @@ backend/logs/
 Thumbs.db
 *.log
 CLAUDE.md
+repomix-output.xml
