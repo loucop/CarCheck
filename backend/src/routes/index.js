@@ -313,6 +313,20 @@ router.post(
 );
 
 /**
+ * PATCH /api/admin/funcionarios/:matricula
+ * M16: editar / ativar-desativar / reset de senha. CSRF já coberto (mutação,
+ * middleware global). Guards anti-lockout no service (admin não se desativa/rebaixa).
+ */
+router.patch(
+    '/admin/funcionarios/:matricula',
+    authenticate,
+    authorize(ROLES.ADMIN),
+    validate(schemas.funcionarioParams, 'params'),
+    validate(schemas.updateFuncionario),
+    authController.updateFuncionario
+);
+
+/**
  * GET /api/admin/bdv
  * Relatório de BDVs com filtros. A7: vistoriador precisa ver para poder corrigir.
  */

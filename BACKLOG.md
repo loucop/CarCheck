@@ -35,7 +35,6 @@
 | M9 | Arch | 🟡 | ⬜ | Chokepoint central de escopo de tenant (pré-req M6) |
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
 | M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
-| M16 | Back+Front | 🟡 | ⬜ | Ciclo de vida de funcionários (desativar/editar/reset; absorve R8) |
 | M17 | Back+Front | 🟡 | ⬜ | Gestão de frota pelo admin (CRUD de veículos) |
 | B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
 | M1-b | Front | 🟢 | ⬜ | Handlers inline `on*=` → `addEventListener` (sub-M1) |
@@ -51,6 +50,7 @@
 | B17 | DB/Infra | 🟢 | ⬜ | Versionar `schema.sql` no repo (pré-req B10/M9) |
 | B19 | Back/Infra | 🟢 | ⬜ | TLS no banco + remover `allowPublicKeyRetrieval` |
 | B24 | Front | 🟢 | ⬜ | Atributos de teclado mobile nos inputs |
+| M16-b | Back+Front | 🟢 | ⬜ | Troca de senha forçada no 1º login (fatia diferida do M16) |
 | I1 | Infra | 🔴 | ⬜ | Windows Server 2012 fora de suporte (bloqueia público) |
 | Deploy | Infra | — | ⬜ | Checklist de produção (HTTPS, CORS, CSP, HSTS, trust proxy) |
 
@@ -152,15 +152,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     (Background Sync) — **exige HTTPS** (deploy público / Cloudflare). Decisão de produto: quanto de
     offline o campo realmente exige. Relaciona-se ao item de PWA/HTTPS do checklist de deploy.
 
-- ⬜ **M16 — Ciclo de vida de funcionários (desativar / editar / reset de senha)** *(auditoria 2026-07-02; absorve o R8 do ROADMAP)*
-  A API de funcionários só tem **listar** e **criar**. Não há desativação, edição nem reset de senha:
-  quando um motorista sai da empresa, o login continua válido até alguém apagar a linha à mão no
-  banco — lacuna de offboarding/segurança que aparece no primeiro churn durante os testes de usuários.
-  - Coluna `ativo` em `funcionarios` (DDL manual, registrar no DONE — ver B17), checada no login;
-    `PATCH /admin/funcionarios/:matricula` (editar campos, desativar, reset de senha com troca
-    forçada no próximo login) + UI em `admin-funcionarios.html`.
-  - **Absorve o R8** (reset de senha) do ROADMAP. Sob multi-tenancy (M6), escopar ao tenant do admin.
-
 - ⬜ **M17 — Gestão de frota pelo admin (CRUD de veículos)** *(auditoria 2026-07-02)*
   Veículos só têm **listar** e **histórico** na API. Cadastrar veículo novo, aposentar um, ou marcar
   `manutencao` exige INSERT/UPDATE manual no banco. No modelo de venda single-tenant-por-cliente
@@ -172,6 +163,14 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
 ---
 
 ## 🟢 Baixo
+
+- ⬜ **M16-b — Reset de senha com troca forçada no próximo login** *(fatia diferida do M16; core entregue 2026-07-02)*
+  O **M16** entregou desativar/editar/reset de senha — no reset, o admin define a nova senha e a
+  informa ao funcionário. Falta a variante "senha provisória": após um reset, **forçar** o funcionário
+  a definir uma nova senha no próximo login. Exige coluna `must_change_password` (DDL manual), flag no
+  retorno do login, uma tela de troca de senha (`POST /api/change-password` autenticado) e o
+  redirecionamento no fluxo de login — feature própria, com página nova, por isso foi diferida.
+  **Absorve o R8** (reset de senha) do ROADMAP.
 
 - ⬜ **B5 — Sem testes automatizados**
   Projeto não possui testes (decisão atual). Caso evolua, priorizar testes dos serviços
@@ -314,4 +313,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, M10, M13, M14, M18, A12, A15, A16, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M10, M13, M14, M16 (core), M18, A12, A15, A16, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.

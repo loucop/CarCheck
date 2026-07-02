@@ -69,6 +69,33 @@ const schemas = {
         coligada: z.enum(['angels', 'cemax']).optional().nullable()
     }).strict(),
 
+    // M16: :matricula da rota de update de funcionário (PK string, igual ao create).
+    funcionarioParams: z.object({
+        matricula: z.string().min(1, 'Matrícula obrigatória').max(20)
+    }).strict(),
+
+    // M16: edição/ativação/reset de senha. Todos os campos são opcionais (PATCH
+    // parcial), mas ao menos um deve vir. `matricula` NÃO é editável (PK/FK) e não
+    // aparece aqui. `senha`, quando presente, segue a política forte do create (B2).
+    updateFuncionario: z.object({
+        nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(120).optional(),
+        cpf: z.string().regex(/^\d{11}$/, 'CPF deve conter 11 dígitos').optional(),
+        nivel_acesso: z.enum(['admin', 'vistoriador', 'motorista'], {
+            errorMap: () => ({ message: "Nível de acesso deve ser 'admin', 'vistoriador' ou 'motorista'" })
+        }).optional(),
+        coligada: z.enum(['angels', 'cemax']).optional().nullable(),
+        ativo: z.boolean().optional(),
+        senha: z.string()
+            .min(8, 'Senha deve ter no mínimo 8 caracteres')
+            .max(128)
+            .regex(/[A-Za-z]/, 'Senha deve conter ao menos uma letra')
+            .regex(/\d/, 'Senha deve conter ao menos um número')
+            .optional()
+    }).strict().refine(
+        (data) => Object.keys(data).length > 0,
+        { message: 'Informe ao menos um campo para atualizar' }
+    ),
+
     // A3: a matrícula NÃO vem do corpo — é derivada do JWT (req.user) no controller.
     // Qualquer `matricula` enviada no body é ignorada (z.object remove chaves desconhecidas).
     // A4-L1: este schema NÃO pode ser .strict() — o frontend envia `matricula` no body

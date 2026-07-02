@@ -479,6 +479,39 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
+- ✅ **M16 — Ciclo de vida de funcionários (core: desativar/editar/reset)** *(implementado e verificado no servidor vivo em 2026-07-02)*
+  A API de funcionários tinha só **listar** e **criar** — um motorista que saía da empresa continuava
+  com login válido até apagarem a linha à mão. Entregue o offboarding completo (menos a fatia de "troca
+  forçada", diferida em **M16-b**). **DDL manual** (sem `schema.sql` versionado — ver **B17**):
+  ```sql
+  ALTER TABLE funcionarios ADD COLUMN ativo TINYINT(1) NOT NULL DEFAULT 1;
+  ```
+  - **Login checa `ativo`** (`auth.service`): a checagem vem **depois** da validação da senha, então a
+    mensagem distinta "Conta desativada" (código `ACCOUNT_DISABLED`, HTTP 403) só é vista por quem já
+    provou a credencial — não vaza estado de conta para quem chuta senhas. `!funcionario.ativo` (robusto
+    a number/boolean do TINYINT).
+  - **`PATCH /api/admin/funcionarios/:matricula`** (admin): edita `nome`/`cpf`/`nivel_acesso`/`coligada`,
+    ativa/desativa (`ativo`) e reseta senha (`senha`, re-hasheada com a política B2). Repo usa **whitelist**
+    de colunas (`UPDATABLE_FIELDS`) — única camada que interpola nome de coluna. `matricula` é **imutável**
+    (PK + alvo de FK, fora da whitelist). Schema `updateFuncionario` é `.strict()` + refine "ao menos um
+    campo".
+  - **Guards anti-lockout** (`auth.service`): um admin não pode **desativar** nem **rebaixar** a própria
+    conta (400). CPF em colisão com outro funcionário → 409 (`cpfTakenByOther`). Ao virar `admin`, zera
+    `coligada` (espelha o cadastro).
+  - **UI** (`admin-funcionarios.html`, `?v=20260702`): colunas **Status** (badge Ativo/Inativo, linha
+    atenuada quando inativo) e **Ações** (Editar / Reset senha / Desativar-Ativar). Modal reaproveitado em
+    modo cadastro **e** edição (matrícula travada, senha oculta na edição); reset de senha via `prompt`;
+    toggle com `confirm`. O botão Desativar some na **própria** linha do admin logado. Ações referenciam a
+    linha por índice no cache (não interpola matrícula em `onclick`). Cliente alinhado à política de senha
+    do servidor (mín. 8 + letra + número; antes pedia 6).
+  - **Sinergia M18:** o controller loga cada ação admin (`[ADMIN] funcionario X atualizado por … campos=[…]`,
+    sem o valor da senha) e o login bloqueado (`[AUTH] login BLOQUEADO (conta desativada) …`).
+  - **Verificação no servidor vivo (curl, 11 passos + browser):** login admin → list com `ativo` → editar
+    nome → reset senha → login ativo 200 → desativar → login inativo **403 ACCOUNT_DISABLED** → reativar →
+    login 200 → auto-desativar **400** → rejeição de campo desconhecido **400**. UI validada no navegador.
+  - **Diferido → M16-b:** reset de senha com **troca forçada no próximo login** (coluna
+    `must_change_password` + tela nova + mudança no fluxo de login). Sob multi-tenancy (M6), escopar ao tenant.
+
 - ✅ **M18 — Logs persistentes em arquivo + eventos de auth** *(implementado e verificado no servidor vivo em 2026-07-02)*
   Antes, o `logger.js` só escrevia em stdout/stderr e o **B8** (NSSM, que capturaria os streams) segue
   bloqueado por falta de admin — todo log morria com a janela do terminal. Duas entregas, sem dependência

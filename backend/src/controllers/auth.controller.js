@@ -35,10 +35,13 @@ const authController = {
             return response.success(res, { user: result.user }, 'Login realizado com sucesso');
 
         } catch (err) {
-            // M18: registra a TENTATIVA falha (credencial inválida) em warn — sinal
-            // de segurança (grep/brute-force). Outros erros seguem para o handler.
+            // M18: registra a TENTATIVA falha em warn — sinal de segurança
+            // (grep/brute-force). Distingue credencial inválida de conta desativada
+            // (M16). Outros erros seguem para o handler.
             if (err && err.code === ERROR_CODES.AUTH_FAILED) {
                 logger.warn(`[AUTH] login FALHOU matricula=${req.body?.matricula ?? '?'} ip=${req.ip}`);
+            } else if (err && err.code === ERROR_CODES.ACCOUNT_DISABLED) {
+                logger.warn(`[AUTH] login BLOQUEADO (conta desativada) matricula=${req.body?.matricula ?? '?'} ip=${req.ip}`);
             }
             next(err);
         } finally {
@@ -80,6 +83,34 @@ const authController = {
             
             return response.created(res, funcionario, 'Funcionário cadastrado com sucesso');
             
+        } catch (err) {
+            next(err);
+        } finally {
+            if (conn) conn.release();
+        }
+    },
+
+    /**
+     * PATCH /api/admin/funcionarios/:matricula
+     * M16: editar / ativar-desativar / reset de senha.
+     */
+    async updateFuncionario(req, res, next) {
+        let conn;
+        try {
+            conn = await pool.getConnection();
+
+            const { matricula } = req.params;
+            const result = await authService.updateFuncionario(
+                conn, matricula, req.user.matricula, req.body
+            );
+
+            // M18: trilha de ação administrativa (quem mudou o quê). `senha` é listada
+            // como campo alterado, mas o valor nunca é logado.
+            logger.info(`[ADMIN] funcionario ${matricula} atualizado por matricula=${req.user.matricula} `
+                + `campos=[${result.camposAlterados.join(',')}] ip=${req.ip}`);
+
+            return response.success(res, result.funcionario, 'Funcionário atualizado com sucesso');
+
         } catch (err) {
             next(err);
         } finally {

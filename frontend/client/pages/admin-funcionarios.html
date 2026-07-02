@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CarCheck - Gestão de Funcionários</title>
-    <link rel="stylesheet" href="../css/style.css?v=20260701">
+    <link rel="stylesheet" href="../css/style.css?v=20260702">
     <style>
         .admin-container {
             padding: 20px;
@@ -57,7 +57,7 @@
             background: #fff;
             color: #000;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            min-width: 560px;
+            min-width: 720px;
         }
 
         th, td {
@@ -79,6 +79,9 @@
         tr:nth-child(even) { background-color: #f9fafb; }
         tr:hover { background-color: #f1f5f9; }
 
+        /* M16: linha de funcionário inativo — atenuada */
+        tr.linha-inativa td { opacity: 0.55; }
+
         .sem-resultados {
             text-align: center;
             padding: 40px 20px;
@@ -99,6 +102,37 @@
         .nivel-admin       { background: rgba(99,102,241,.15); color: #6366f1; border: 1px solid #818cf8; }
         .nivel-vistoriador { background: rgba(245,158,11,.15); color: #b45309; border: 1px solid #fcd34d; }
         .nivel-motorista   { background: rgba(16,185,129,.15); color: #059669; border: 1px solid #6ee7b7; }
+
+        /* M16: badge de status ativo/inativo */
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .status-ativo   { background: rgba(16,185,129,.15); color: #059669; border: 1px solid #6ee7b7; }
+        .status-inativo { background: rgba(239,68,68,.12);  color: #b91c1c; border: 1px solid #fca5a5; }
+
+        /* M16: botões de ação por linha */
+        .col-acoes { white-space: nowrap; }
+        .btn-acao {
+            padding: 6px 11px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: bold;
+            color: white;
+            margin: 2px 3px 2px 0;
+        }
+        .btn-editar { background: #3b82f6; }
+        .btn-editar:hover { background: #2563eb; }
+        .btn-reset  { background: #f59e0b; }
+        .btn-reset:hover { background: #d97706; }
+        .btn-toggle { background: #64748b; }
+        .btn-toggle:hover { background: #475569; }
 
         /* Modal */
         .modal {
@@ -156,6 +190,11 @@
             color: #1e293b;
             background: white;
             box-sizing: border-box;
+        }
+
+        .input-group input:disabled {
+            background: #f1f5f9;
+            color: #64748b;
         }
 
         .input-group select option {
@@ -228,11 +267,13 @@
                         <th>CPF</th>
                         <th>Nível de Acesso</th>
                         <th>Coligada</th>
+                        <th>Status</th>
+                        <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody id="corpo-tabela">
                     <tr>
-                        <td colspan="5" class="sem-resultados">Carregando...</td>
+                        <td colspan="7" class="sem-resultados">Carregando...</td>
                     </tr>
                 </tbody>
             </table>
@@ -240,11 +281,11 @@
 
     </div>
 
-    <!-- Modal: Novo Funcionário -->
+    <!-- Modal: Novo / Editar Funcionário -->
     <div id="modal-funcionario" class="modal">
         <div class="modal-content">
             <button class="modal-close" onclick="fecharModal()">&times;</button>
-            <h2 style="margin: 0 0 20px; color: #1e293b;">Cadastrar Funcionário</h2>
+            <h2 id="modal-titulo" style="margin: 0 0 20px; color: #1e293b;">Cadastrar Funcionário</h2>
 
             <form id="form-funcionario" onsubmit="salvarFuncionario(event)">
 
@@ -255,7 +296,7 @@
 
                 <div class="input-group">
                     <label for="cad_cpf">CPF (apenas números) *</label>
-                    <input type="text" id="cad_cpf" maxlength="11" placeholder="12345678901" required />
+                    <input type="text" id="cad_cpf" inputmode="numeric" maxlength="11" placeholder="12345678901" required />
                 </div>
 
                 <div class="input-group">
@@ -263,9 +304,9 @@
                     <input type="text" id="cad_matricula" placeholder="Ex: 1042" required />
                 </div>
 
-                <div class="input-group">
+                <div class="input-group" id="grupo-senha">
                     <label for="cad_senha">Senha *</label>
-                    <input type="password" id="cad_senha" placeholder="Mínimo 6 caracteres" required />
+                    <input type="password" id="cad_senha" placeholder="Mín. 8 caracteres, com letra e número" required />
                 </div>
 
                 <div class="input-group">
@@ -287,69 +328,110 @@
                     </select>
                 </div>
 
-                <button type="submit" class="btn-salvar">Salvar Cadastro</button>
+                <button type="submit" class="btn-salvar">Salvar</button>
                 <button type="button" class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
             </form>
         </div>
     </div>
 
-    <script src="../js/config.js?v=20260701"></script>
+    <script src="../js/config.js?v=20260702"></script>
     <script>
         // ─── Auth ──────────────────────────────────────────────────────
+        // M4 Fase 2: a sessão vive no cookie httpOnly; o guard checa `usuario` + nível.
+        const usuarioAtual = JSON.parse(localStorage.getItem('usuario') || 'null');
         (function () {
-            // M4 Fase 2: a sessão vive no cookie httpOnly; o guard checa `usuario` + nível.
-            const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
-            if (!usuario || usuario.nivel_acesso !== 'admin') {
+            if (!usuarioAtual || usuarioAtual.nivel_acesso !== 'admin') {
                 window.location.href = 'login.html';
             }
         })();
+
+        // Cache da lista carregada — as ações por linha referenciam pelo índice
+        // (evita interpolar a matrícula em onclick).
+        let funcionariosCache = [];
+        // null = modo cadastro; matrícula = modo edição.
+        let modoEdicao = null;
 
         // ─── Load table ───────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', carregarFuncionarios);
 
         async function carregarFuncionarios() {
             const corpo = document.getElementById('corpo-tabela');
-            corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Carregando...</td></tr>';
+            corpo.innerHTML = '<tr><td colspan="7" class="sem-resultados">Carregando...</td></tr>';
 
             try {
                 const res = await apiFetch(`/admin/funcionarios`);
 
                 if (!res.ok) {
-                    corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Erro ao carregar dados.</td></tr>';
+                    corpo.innerHTML = '<tr><td colspan="7" class="sem-resultados">Erro ao carregar dados.</td></tr>';
                     return;
                 }
 
                 const json = await res.json();
-                const lista = json.data || [];
+                funcionariosCache = json.data || [];
 
                 document.getElementById('info-resultado').textContent =
-                    `${lista.length} funcionário(s) cadastrado(s)`;
+                    `${funcionariosCache.length} funcionário(s) cadastrado(s)`;
 
-                if (!lista.length) {
-                    corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Nenhum funcionário cadastrado.</td></tr>';
+                if (!funcionariosCache.length) {
+                    corpo.innerHTML = '<tr><td colspan="7" class="sem-resultados">Nenhum funcionário cadastrado.</td></tr>';
                     return;
                 }
 
-                corpo.innerHTML = lista.map(f => `
-                    <tr>
+                corpo.innerHTML = funcionariosCache.map((f, idx) => {
+                    const ativo = isAtivo(f);
+                    const ehProprio = usuarioAtual && String(f.matricula) === String(usuarioAtual.matricula);
+                    return `
+                    <tr class="${ativo ? '' : 'linha-inativa'}">
                         <td><code>${escHtml(f.matricula)}</code></td>
                         <td>${escHtml(f.nome)}</td>
                         <td>${formatCPF(f.cpf)}</td>
                         <td>${nivelBadge(f.nivel_acesso)}</td>
                         <td>${f.coligada ? escHtml(f.coligada).toUpperCase() : '—'}</td>
-                    </tr>
-                `).join('');
+                        <td><span class="status-badge ${ativo ? 'status-ativo' : 'status-inativo'}">${ativo ? 'Ativo' : 'Inativo'}</span></td>
+                        <td class="col-acoes">
+                            <button class="btn-acao btn-editar" onclick="editarFuncionario(${idx})">Editar</button>
+                            <button class="btn-acao btn-reset" onclick="resetSenha(${idx})">Reset senha</button>
+                            ${ehProprio ? '' : `<button class="btn-acao btn-toggle" onclick="toggleAtivo(${idx})">${ativo ? 'Desativar' : 'Ativar'}</button>`}
+                        </td>
+                    </tr>`;
+                }).join('');
 
             } catch (err) {
                 if (err && err.isAuthRedirect) return;
-                corpo.innerHTML = '<tr><td colspan="5" class="sem-resultados">Erro de comunicação com o servidor.</td></tr>';
+                corpo.innerHTML = '<tr><td colspan="7" class="sem-resultados">Erro de comunicação com o servidor.</td></tr>';
             }
         }
 
-        // ─── Modal ────────────────────────────────────────────────────
+        // ─── Modal (cadastro + edição) ────────────────────────────────
         function abrirModal() {
+            modoEdicao = null;
             document.getElementById('form-funcionario').reset();
+            document.getElementById('modal-titulo').textContent = 'Cadastrar Funcionário';
+            document.getElementById('cad_matricula').disabled = false;
+            // senha obrigatória só no cadastro
+            document.getElementById('grupo-senha').style.display = 'block';
+            document.getElementById('cad_senha').required = true;
             document.getElementById('grupo-coligada').style.display = 'none';
+            document.getElementById('modal-funcionario').style.display = 'flex';
+        }
+
+        function editarFuncionario(idx) {
+            const f = funcionariosCache[idx];
+            modoEdicao = f.matricula;
+
+            document.getElementById('form-funcionario').reset();
+            document.getElementById('modal-titulo').textContent = 'Editar Funcionário';
+            document.getElementById('cad_nome').value = f.nome;
+            document.getElementById('cad_cpf').value = f.cpf;
+            document.getElementById('cad_matricula').value = f.matricula;
+            document.getElementById('cad_matricula').disabled = true;   // PK imutável
+            // senha NÃO se altera aqui — reset é ação separada
+            document.getElementById('grupo-senha').style.display = 'none';
+            document.getElementById('cad_senha').required = false;
+            document.getElementById('cad_cargo').value = f.nivel_acesso;
+            toggleColigada();
+            if (f.coligada) document.getElementById('cad_coligada').value = f.coligada;
+
             document.getElementById('modal-funcionario').style.display = 'flex';
         }
 
@@ -366,23 +448,53 @@
             }
         }
 
-        // ─── Submit ───────────────────────────────────────────────────
+        // ─── Submit (cria OU edita conforme modoEdicao) ───────────────
         async function salvarFuncionario(e) {
             e.preventDefault();
 
-            const nome        = document.getElementById('cad_nome').value.trim();
-            const cpf         = document.getElementById('cad_cpf').value.trim();
-            const matricula   = document.getElementById('cad_matricula').value.trim();
-            const senha       = document.getElementById('cad_senha').value;
+            const nome         = document.getElementById('cad_nome').value.trim();
+            const cpf          = document.getElementById('cad_cpf').value.trim();
             const nivel_acesso = document.getElementById('cad_cargo').value;
-            const coligada    = document.getElementById('cad_coligada').value;
+            const coligada     = document.getElementById('cad_coligada').value;
 
-            if (nome.length < 3)         { alert('Nome deve ter no mínimo 3 caracteres.'); return; }
-            if (!/^\d{11}$/.test(cpf))   { alert('CPF deve conter exatamente 11 dígitos numéricos.'); return; }
-            if (!matricula)              { alert('Informe a matrícula.'); return; }
-            if (senha.length < 6)        { alert('Senha deve ter no mínimo 6 caracteres.'); return; }
-            if (!nivel_acesso)           { alert('Selecione o nível de acesso.'); return; }
+            if (nome.length < 3)       { alert('Nome deve ter no mínimo 3 caracteres.'); return; }
+            if (!/^\d{11}$/.test(cpf)) { alert('CPF deve conter exatamente 11 dígitos numéricos.'); return; }
+            if (!nivel_acesso)         { alert('Selecione o nível de acesso.'); return; }
             if (nivel_acesso !== 'admin' && !coligada) { alert('Selecione a coligada.'); return; }
+
+            if (modoEdicao !== null) {
+                // ── Edição (PATCH) ──
+                const payload = { nome, cpf, nivel_acesso };
+                payload.coligada = nivel_acesso === 'admin' ? null : coligada;
+
+                try {
+                    const res = await apiFetch(`/admin/funcionarios/${encodeURIComponent(modoEdicao)}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify(payload)
+                    });
+                    const json = await res.json();
+                    if (!res.ok) {
+                        alert(`Erro: ${json.error || 'Não foi possível salvar as alterações.'}`);
+                        return;
+                    }
+                    fecharModal();
+                    await carregarFuncionarios();
+                } catch (err) {
+                    if (err && err.isAuthRedirect) return;
+                    alert('Erro de comunicação com o servidor.');
+                }
+                return;
+            }
+
+            // ── Cadastro (POST) ──
+            const matricula = document.getElementById('cad_matricula').value.trim();
+            const senha     = document.getElementById('cad_senha').value;
+
+            if (!matricula)     { alert('Informe a matrícula.'); return; }
+            if (senha.length < 8 || !/[A-Za-z]/.test(senha) || !/\d/.test(senha)) {
+                alert('Senha deve ter no mínimo 8 caracteres, com ao menos uma letra e um número.');
+                return;
+            }
 
             const payload = { nome, cpf, matricula, senha, nivel_acesso };
             if (nivel_acesso !== 'admin') payload.coligada = coligada;
@@ -392,17 +504,61 @@
                     method: 'POST',
                     body: JSON.stringify(payload)
                 });
-
                 const json = await res.json();
-
                 if (!res.ok) {
                     alert(`Erro: ${json.error || 'Não foi possível cadastrar o funcionário.'}`);
                     return;
                 }
-
                 fecharModal();
                 await carregarFuncionarios();
+            } catch (err) {
+                if (err && err.isAuthRedirect) return;
+                alert('Erro de comunicação com o servidor.');
+            }
+        }
 
+        // ─── Ações por linha ──────────────────────────────────────────
+        async function resetSenha(idx) {
+            const f = funcionariosCache[idx];
+            const nova = prompt(`Nova senha para ${f.nome}\n(mín. 8 caracteres, com ao menos uma letra e um número):`);
+            if (nova === null) return;   // cancelou
+            if (nova.length < 8 || !/[A-Za-z]/.test(nova) || !/\d/.test(nova)) {
+                alert('Senha deve ter no mínimo 8 caracteres, com ao menos uma letra e um número.');
+                return;
+            }
+            try {
+                const res = await apiFetch(`/admin/funcionarios/${encodeURIComponent(f.matricula)}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ senha: nova })
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    alert(`Erro: ${json.error || 'Não foi possível redefinir a senha.'}`);
+                    return;
+                }
+                alert(`Senha de ${f.nome} redefinida. Informe a nova senha ao funcionário.`);
+            } catch (err) {
+                if (err && err.isAuthRedirect) return;
+                alert('Erro de comunicação com o servidor.');
+            }
+        }
+
+        async function toggleAtivo(idx) {
+            const f = funcionariosCache[idx];
+            const ativo = isAtivo(f);
+            const acao = ativo ? 'desativar' : 'ativar';
+            if (!confirm(`Deseja ${acao} o funcionário ${f.nome}?`)) return;
+            try {
+                const res = await apiFetch(`/admin/funcionarios/${encodeURIComponent(f.matricula)}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ ativo: !ativo })
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    alert(`Erro: ${json.error || 'Não foi possível alterar o status.'}`);
+                    return;
+                }
+                await carregarFuncionarios();
             } catch (err) {
                 if (err && err.isAuthRedirect) return;
                 alert('Erro de comunicação com o servidor.');
@@ -410,6 +566,11 @@
         }
 
         // ─── Helpers ──────────────────────────────────────────────────
+        function isAtivo(f) {
+            // `ativo` chega como 1/0 (TINYINT). Trata ausência como ativo (compat).
+            return f.ativo === undefined || f.ativo === null || f.ativo === 1 || f.ativo === true;
+        }
+
         function nivelBadge(nivel) {
             const map = {
                 admin:       ['nivel-badge nivel-admin',       'Admin'],

@@ -45,10 +45,21 @@ const authService = {
         }
 
         if (!senhaValida) {
-            throw { 
-                message: 'Usuário ou senha inválidos', 
+            throw {
+                message: 'Usuário ou senha inválidos',
                 code: ERROR_CODES.AUTH_FAILED,
                 statusCode: 401
+            };
+        }
+
+        // M16: conta desativada (offboarding). Checado DEPOIS da validação da senha,
+        // então esta mensagem distinta só é vista por quem já provou a credencial —
+        // não vaza estado de conta para quem só chuta senhas.
+        if (!funcionario.ativo) {
+            throw {
+                message: 'Conta desativada. Contate o administrador.',
+                code: ERROR_CODES.ACCOUNT_DISABLED,
+                statusCode: 403
             };
         }
 
@@ -103,6 +114,68 @@ const authService = {
             cpf: funcionario.cpf,
             nivel_acesso: funcionario.nivel_acesso
         };
+    },
+
+    /**
+     * M16: editar funcionário (nome/cpf/nivel/coligada), ativar/desativar e reset
+     * de senha. `data` já validado pelo Zod (updateFuncionario). `adminMatricula` é
+     * o admin autenticado — usado nos guards anti-lockout.
+     */
+    async updateFuncionario(conn, matricula, adminMatricula, data) {
+        const alvo = await funcionarioRepository.findByMatricula(conn, matricula);
+        if (!alvo) {
+            throw {
+                message: 'Funcionário não encontrado',
+                code: ERROR_CODES.RESOURCE_NOT_FOUND,
+                statusCode: 404
+            };
+        }
+
+        // Guards anti-lockout: um admin não pode se desativar nem se rebaixar (fecharia
+        // a própria porta). Comparação frouxa: matricula pode vir string vs number.
+        const ehProprio = String(matricula) === String(adminMatricula);
+        if (ehProprio && data.ativo === false) {
+            throw {
+                message: 'Você não pode desativar a própria conta.',
+                code: ERROR_CODES.VALIDATION_ERROR,
+                statusCode: 400
+            };
+        }
+        if (ehProprio && data.nivel_acesso !== undefined && data.nivel_acesso !== 'admin') {
+            throw {
+                message: 'Você não pode rebaixar o próprio nível de acesso.',
+                code: ERROR_CODES.VALIDATION_ERROR,
+                statusCode: 400
+            };
+        }
+
+        // CPF não pode colidir com o de outro funcionário.
+        if (data.cpf !== undefined && await funcionarioRepository.cpfTakenByOther(conn, data.cpf, matricula)) {
+            throw {
+                message: 'CPF já cadastrado para outro funcionário',
+                code: ERROR_CODES.DUPLICATE_ENTRY,
+                statusCode: 409
+            };
+        }
+
+        // Monta os campos a gravar a partir do que veio (todos opcionais).
+        const fields = {};
+        if (data.nome !== undefined) fields.nome = data.nome;
+        if (data.cpf !== undefined) fields.cpf = data.cpf;
+        if (data.nivel_acesso !== undefined) {
+            fields.nivel_acesso = data.nivel_acesso;
+            // Admin não tem coligada (espelha a regra do cadastro).
+            if (data.nivel_acesso === 'admin') fields.coligada = null;
+        }
+        if (data.coligada !== undefined) fields.coligada = data.coligada;
+        if (data.ativo !== undefined) fields.ativo = data.ativo ? 1 : 0;
+        if (data.senha !== undefined) fields.senha = await bcrypt.hash(data.senha, 10);
+
+        await funcionarioRepository.update(conn, matricula, fields);
+
+        // Devolve o registro atualizado (sem senha) + quais campos mudaram (p/ auditoria).
+        const atualizado = await funcionarioRepository.findByMatricula(conn, matricula);
+        return { funcionario: atualizado, camposAlterados: Object.keys(fields) };
     }
 };
 
