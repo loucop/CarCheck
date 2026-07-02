@@ -246,6 +246,83 @@ and `DependOnService mysql` above address this).
 
 ---
 
+## Scheduled Database Backups
+
+For an odometer/audit system, data loss is catastrophic. Two Node scripts handle
+backup and (tested) restore. They shell out to XAMPP's `mysqldump`/`mysql`, read
+credentials from `backend/.env` (by absolute path, so they don't depend on the
+working directory), and pass the DB password via `MYSQL_PWD` (never on the command
+line). **No administrator rights are required** — unlike the NSSM service (B8), a
+per-user scheduled task runs under the standard server account.
+
+Relevant `.env` settings (see `.env.example`): `MYSQLDUMP_PATH`, `MYSQL_PATH`,
+`BACKUP_DIR`, `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`.
+
+### Taking a backup
+
+    cd backend
+    npm run backup-db
+
+This writes a gzip-compressed dump to `BACKUP_DIR` (default `backend/backups/`,
+which is gitignored):
+
+    backups/daily/   carcheck-<db>-<timestamp>.sql.gz   (keeps BACKUP_KEEP_DAILY, default 7)
+    backups/weekly/  carcheck-<db>-<timestamp>.sql.gz   (keeps BACKUP_KEEP_WEEKLY, default 4)
+
+Every run writes a daily backup and prunes old ones. A copy is promoted to
+`weekly/` whenever the newest weekly backup is 7+ days old — so weekly retention
+is correct regardless of which day the task happens to run. The dump uses
+`--single-transaction` (consistent InnoDB snapshot without locking writes).
+
+> **Put `BACKUP_DIR` on a different disk/share.** A backup sitting next to the
+> database on the same disk does not survive a disk failure. Set `BACKUP_DIR` in
+> `.env` to another drive or a network path (e.g. `D:\Backups\CarCheck`).
+
+### Scheduling it (Task Scheduler, no admin)
+
+Register a daily task that runs as the current user. Run once in a normal
+(non-elevated) terminal, adjusting the node path and deploy path if needed:
+
+    schtasks /Create /TN CarCheckBackup /SC DAILY /ST 02:00 /F ^
+      /TR "\"C:\Program Files\nodejs\node.exe\" \"C:\xampp\htdocs\CarCheck\backend\scripts\backup-db.js\""
+
+By default the task only runs while the user is logged on. To run even when logged
+off (recommended, since the server may sit at the lock screen), add `/RU` and
+enter the account password when prompted:
+
+    schtasks /Create /TN CarCheckBackup /SC DAILY /ST 02:00 /F /RU geral /RP * ^
+      /TR "\"C:\Program Files\nodejs\node.exe\" \"C:\xampp\htdocs\CarCheck\backend\scripts\backup-db.js\""
+
+Verify and trigger a one-off run:
+
+    schtasks /Query /TN CarCheckBackup
+    schtasks /Run   /TN CarCheckBackup
+
+### Restoring — and testing the restore
+
+> **A backup you have never restored is not a backup.** Test the restore into a
+> throwaway database. The dump is table-level (no `CREATE DATABASE`/`USE`), so the
+> restore always targets an explicit `--target-db`, and a test never touches prod.
+
+Safe test restore (creates a scratch DB, restores, prints per-table row counts you
+can compare against production, then tells you how to drop it):
+
+    cd backend
+    npm run restore-db -- backups/daily/carcheck-<db>-<timestamp>.sql.gz --target-db=carcheck_restore_test
+
+If the row counts match production, the backup is good. Clean up the scratch DB
+with the `DROP DATABASE` command the script prints.
+
+Real restore over production (destructive — overwrites the live tables, so it is
+blocked without `--yes`):
+
+    npm run restore-db -- backups/daily/carcheck-<db>-<timestamp>.sql.gz --target-db=carcheck --yes
+
+(If the production database was lost entirely, the script recreates it with
+`CREATE DATABASE IF NOT EXISTS` before restoring.)
+
+---
+
 ## License
 
 This project is proprietary software.

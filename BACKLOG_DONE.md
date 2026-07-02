@@ -27,6 +27,26 @@
 
 ## 🟠 Alto — concluído
 
+- ✅ **A16 — Backups agendados do banco + restore testado** *(implementado e testado no servidor em 2026-07-02)*
+  Dois scripts Node standalone que shell-out para o `mysqldump`/`mysql` do XAMPP, leem credenciais do
+  `backend/.env` por **caminho absoluto** (independem do CWD do Agendador de Tarefas) e passam a senha via
+  `MYSQL_PWD` (nunca na linha de comando). **Não exigem admin** — tarefa por-usuário, ao contrário do NSSM (B8).
+  - **`scripts/backup-db.js`** (`npm run backup-db`): dump comprimido em gzip com `--single-transaction`
+    (snapshot InnoDB consistente sem travar escrita). Rotação **`backups/daily/`** (mantém `BACKUP_KEEP_DAILY`=7)
+    + **`backups/weekly/`** (mantém `BACKUP_KEEP_WEEKLY`=4); a promoção semanal dispara quando o backup semanal
+    mais novo tem ≥7 dias — robusto a qual dia a tarefa roda. Falha limpa (apaga `.gz` parcial, exit 1).
+  - **`scripts/restore-db.js`** (`npm run restore-db`): dump em nível de tabela (sem `--databases`), então o
+    restore escolhe `--target-db` explícito. Isso torna o **teste de restore seguro**: restaura num banco de
+    rascunho, imprime contagem de linhas por tabela p/ conferência, e o restore sobre PRODUÇÃO fica travado
+    atrás de `--yes`. Cria o banco se não existir (DR total).
+  - **Verificado no servidor (2026-07-02):** backup real gerou `.sql.gz` de 2.9 MB (daily + weekly);
+    restore num rascunho `carcheck_restore_test` populou 6 funcionários / 3 veículos / 32 checklists /
+    33 bdv / 31 paradas — bateu com a produção. Backup que nunca foi restaurado não é backup: este foi.
+  - **Config novo no `.env.example`:** `MYSQLDUMP_PATH`, `MYSQL_PATH`, `BACKUP_DIR`, `BACKUP_KEEP_DAILY`,
+    `BACKUP_KEEP_WEEKLY`. Docs em `README.md` ("Scheduled Database Backups", incl. `schtasks` sem admin).
+    `backend/backups/` no `.gitignore`. **Pendente (infra, não código):** registrar a tarefa no Agendador e
+    apontar `BACKUP_DIR` para outro disco/share (durabilidade). Não confundir com B14 (retenção) nem B17 (schema).
+
 - ✅ **A12 — Índices em queries quentes** *(aplicado e verificado no banco vivo em 2026-07-01)*
   Auditoria do `information_schema` confirmou que **todas as FKs são reais** (índices single-col
   auto-criados em `bdv.checklist_id`/`matricula`/`veiculo_id`, `checklists.matricula`/`veiculo_id`,

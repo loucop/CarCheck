@@ -30,7 +30,6 @@
 |------|-----------|----|----|--------|
 | A7 | Front | 🟠 | 🔵 | UI de correção do vistoriador (slice 4; backend pronto) |
 | A15 | Back/Infra | 🟠 | ⬜ | Rodar migração de senhas em prod + aposentar plaintext |
-| A16 | Infra | 🟠 | ⬜ | Backups agendados + restore testado (ex-R1; pré-teste de usuários) |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
@@ -102,14 +101,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   - **Micro-fix embutido:** o default de `JWT_EXPIRES_IN` no código é `12h` (`auth.service.js` +
     `cookie.js`), mas a postura documentada é `2h` — se a env faltar, a janela do token sextuplica
     em silêncio. Trocar ambos os defaults para `2h`.
-
-- ⬜ **A16 — Backups agendados do banco + restore testado** *(puxado do ROADMAP **R1** em 2026-07-02 — pré-requisito para testes com usuários, não pós-produção)*
-  Só houve um `mysqldump` manual (no B20). Antes de usuários reais gerarem dados reais:
-  - **Backup agendado:** `mysqldump` via Task Scheduler — tarefa por usuário roda como conta padrão,
-    **não exige admin** (ao contrário do NSSM/B8). Rotação simples (ex.: 7 diários + 4 semanais).
-  - **Restore documentado e efetivamente testado** — backup sem restore testado não é backup.
-  Para um sistema de registro (odômetro/auditoria), perda de dados é catastrófica. Não confundir com
-  **B14** (retenção/particionamento) nem **B17** (schema versionado).
 
 ---
 
@@ -350,4 +341,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, M10, M13, M14, A12, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M10, M13, M14, A12, A16, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.

@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "migrate-passwords": "node scripts/migrate-passwords.js"
+    "migrate-passwords": "node scripts/migrate-passwords.js",
+    "backup-db": "node scripts/backup-db.js",
+    "restore-db": "node scripts/restore-db.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
