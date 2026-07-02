@@ -649,6 +649,13 @@ removido; `nosniff` e `X-Frame-Options` ativos. `hsts: false` (app em HTTP/LAN).
 
 ## 🟢 Baixo — concluído
 
+- ✅ **B3 — Limite de payload de 50mb** *(fechado contra o A4-H2 em 2026-07-02 — nenhum trabalho restante)*
+  O pedido do B3 (reduzir o limite global e isolar o upload pesado em rota dedicada) já tinha sido
+  integralmente entregue pelo **A4-H2** (2026-06-16): default global `100kb` + `1mb` só em
+  `POST /api/checklist` via dispatcher no `index.js`, com handler 413 (`PAYLOAD_TOO_LARGE`).
+  Confirmado por inspeção do código na auditoria de 2026-07-02. A ideia de "rota dedicada de upload"
+  só volta a fazer sentido na **fase 2 do A11** (object storage), onde já está rastreada.
+
 - ✅ **B20 — PKs `auto_increment` migradas de `int(11)` para `bigint(20)`** *(concluído em 2026-07-01; DDL aplicado no banco vivo + fix de app deployado e testado)*
   O checup revelou que os PKs core **eram `int(11)`** (não `bigint`, ao contrário do que o CLAUDE.md dizia) —
   só `correcoes*` (A7) já eram `bigint`. Overflow era inatingível no domínio (teto 2,14 bi), mas migrado como

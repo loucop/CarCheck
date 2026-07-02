@@ -12,9 +12,10 @@
 > 🚀 **Roadmap técnico de produtização** (pós-produção — o que fazer depois do app estável)
 > vive em **[`ROADMAP.md`](ROADMAP.md)**. Este backlog é o trabalho de *agora*; o roadmap é o *depois*.
 >
-> **Nota:** a numeração de segurança chegou até **S3** (todos concluídos → DONE). Se existiam
-> itens **S4+** da auditoria original, foram perdidos com o chat — rodar `/security-review`
-> para confirmar se sobrou algo.
+> **Nota:** a numeração de segurança chegou até **S3** (todos concluídos → DONE). Itens **S4+**
+> da auditoria original foram perdidos com o chat, mas a auditoria completa do backend em
+> **2026-07-02** não encontrou nada pendente além do já rastreado — o único achado de segurança
+> sem item virou o **A15** (migração de senhas). Nota resolvida.
 
 ---
 
@@ -28,13 +29,17 @@
 | ID | Domínio | Pri | St | Resumo |
 |------|-----------|----|----|--------|
 | A7 | Front | 🟠 | 🔵 | UI de correção do vistoriador (slice 4; backend pronto) |
+| A15 | Back/Infra | 🟠 | ⬜ | Rodar migração de senhas em prod + aposentar plaintext |
+| A16 | Infra | 🟠 | ⬜ | Backups agendados + restore testado (ex-R1; pré-teste de usuários) |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
 | M9 | Arch | 🟡 | ⬜ | Chokepoint central de escopo de tenant (pré-req M6) |
 | M11 | Back+DB | 🟡 | ⬜ | Reconciliação de drift da âncora de KM (job/relatório) |
 | M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
-| B3 | Back | 🟢 | ⬜ | Limite de payload (rever se ainda distinto vs A4) |
+| M16 | Back+Front | 🟡 | ⬜ | Ciclo de vida de funcionários (desativar/editar/reset; absorve R8) |
+| M17 | Back+Front | 🟡 | ⬜ | Gestão de frota pelo admin (CRUD de veículos) |
+| M18 | Back | 🟡 | ⬜ | Logs persistentes em arquivo + eventos de auth (fatia de R3/R6) |
 | B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
 | M1-b | Front | 🟢 | ⬜ | Handlers inline `on*=` → `addEventListener` (sub-M1) |
 | M1-c | Front | 🟢 | ⬜ | Estilos inline → CSS (sub-M1) |
@@ -85,6 +90,26 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   (filesystem / object storage Cloudflare R2/S3), guardando só a URL/chave — mantém `checklists`
   pequena/quente e torna o particionamento/arquivamento trivial. Pareia com **B14** (retenção) e só
   vale a pena junto da publicação/Cloudflare.
+
+- ⬜ **A15 — Executar a migração de senhas em produção + aposentar o dual-support de plaintext** *(auditoria 2026-07-02)*
+  O script `scripts/migrate-passwords.js` foi corrigido e endurecido no **A5**, mas **nunca foi
+  executado** no banco vivo: senhas legadas seguem em texto plano, comparadas com `===` no
+  `auth.service.js` — o que anula o **M13** para esses usuários (a igualação de timing só vale no
+  caminho bcrypt) e deixa credenciais legíveis no banco.
+  - **Plano:** `--dry-run` contra o banco vivo → backup da tabela `funcionarios` → rodar com
+    `--i-know-its-fixed` → validar logins reais → em sessão futura, **remover o branch plaintext**
+    do `auth.service` (login vira bcrypt-only, fechando também o caveat de timing do M13).
+  - **Micro-fix embutido:** o default de `JWT_EXPIRES_IN` no código é `12h` (`auth.service.js` +
+    `cookie.js`), mas a postura documentada é `2h` — se a env faltar, a janela do token sextuplica
+    em silêncio. Trocar ambos os defaults para `2h`.
+
+- ⬜ **A16 — Backups agendados do banco + restore testado** *(puxado do ROADMAP **R1** em 2026-07-02 — pré-requisito para testes com usuários, não pós-produção)*
+  Só houve um `mysqldump` manual (no B20). Antes de usuários reais gerarem dados reais:
+  - **Backup agendado:** `mysqldump` via Task Scheduler — tarefa por usuário roda como conta padrão,
+    **não exige admin** (ao contrário do NSSM/B8). Rotação simples (ex.: 7 diários + 4 semanais).
+  - **Restore documentado e efetivamente testado** — backup sem restore testado não é backup.
+  Para um sistema de registro (odômetro/auditoria), perda de dados é catastrófica. Não confundir com
+  **B14** (retenção/particionamento) nem **B17** (schema versionado).
 
 ---
 
@@ -150,15 +175,39 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
     (Background Sync) — **exige HTTPS** (deploy público / Cloudflare). Decisão de produto: quanto de
     offline o campo realmente exige. Relaciona-se ao item de PWA/HTTPS do checklist de deploy.
 
+- ⬜ **M16 — Ciclo de vida de funcionários (desativar / editar / reset de senha)** *(auditoria 2026-07-02; absorve o R8 do ROADMAP)*
+  A API de funcionários só tem **listar** e **criar**. Não há desativação, edição nem reset de senha:
+  quando um motorista sai da empresa, o login continua válido até alguém apagar a linha à mão no
+  banco — lacuna de offboarding/segurança que aparece no primeiro churn durante os testes de usuários.
+  - Coluna `ativo` em `funcionarios` (DDL manual, registrar no DONE — ver B17), checada no login;
+    `PATCH /admin/funcionarios/:matricula` (editar campos, desativar, reset de senha com troca
+    forçada no próximo login) + UI em `admin-funcionarios.html`.
+  - **Absorve o R8** (reset de senha) do ROADMAP. Sob multi-tenancy (M6), escopar ao tenant do admin.
+
+- ⬜ **M17 — Gestão de frota pelo admin (CRUD de veículos)** *(auditoria 2026-07-02)*
+  Veículos só têm **listar** e **histórico** na API. Cadastrar veículo novo, aposentar um, ou marcar
+  `manutencao` exige INSERT/UPDATE manual no banco. No modelo de venda single-tenant-por-cliente
+  (ROADMAP), o admin do cliente precisa gerir a própria frota — hoje isso é um chamado de suporte.
+  - `POST /admin/veiculos` e `PATCH /admin/veiculos/:id` (modelo/placa/status) + UI admin.
+  - **`km_atual` fica FORA** deste item — correção de âncora já tem caminho auditado e gated
+    (A7 §6.2, `PATCH /correcoes/veiculo/:id/km`); não criar um segundo caminho de escrita sem auditoria.
+
+- ⬜ **M18 — Logs persistentes em arquivo + eventos de auth** *(fatia pré-teste dos R3/R6 do ROADMAP; auditoria 2026-07-02)*
+  O `logger.js` escreve em stdout/stderr e o **B8** (NSSM, que capturaria os streams em
+  `backend/logs/`) está bloqueado por falta de admin — hoje **todo log morre com a janela do
+  terminal**. Um crash durante os testes com usuários seria indiagnosticável. Além disso, nada
+  registra login (sucesso/falha) — sem trilha de auditoria durante o período de feedback.
+  - **Sink de arquivo** no `logger.js`: append em `backend/logs/` (já no `.gitignore`), rotação
+    simples por tamanho/dia. Sem dependência nova, sem admin.
+  - **Eventos de auth em nível `info`:** login sucesso/falha (matrícula + IP — finalidade legítima
+    LGPD, diferente do PII de debug removido no A14) e logout.
+  - O restante do R3 (polling do `/health` + alerta) e do R6 (acesso a relatório, CRUD de usuário)
+    **fica no ROADMAP**. Parcialmente superseded pelo B8 quando o gestor instalar o serviço — o sink
+    próprio continua útil (formato consistente, independe do SO).
+
 ---
 
 ## 🟢 Baixo
-
-- ⬜ **B3 — Limite de payload de 50mb**
-  `express.json({ limit: '50mb' })` é amplo (necessário para o mapa de avaria em base64).
-  Avaliar reduzir o limite global e isolar o upload pesado em rota dedicada (superfície de DoS).
-  *(Nota: o A4-H2 já trocou o `50mb` global por `100kb` default + `1mb` só no checklist — confirmar se
-  este item ainda é distinto ou pode ser fechado contra o A4.)*
 
 - ⬜ **B5 — Sem testes automatizados**
   Projeto não possui testes (decisão atual). Caso evolua, priorizar testes dos serviços
@@ -301,4 +350,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, M10, M13, M14, A12, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M10, M13, M14, A12, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.

@@ -26,14 +26,14 @@
 
 | ID | Eixo | Resumo | Origem |
 |------|------|--------|--------|
-| R1 | Confiabilidade | Backups automáticos de banco + restore testado | 🆕 |
+| R1 | Confiabilidade | Backups automáticos de banco + restore testado | 🔗 movido → **A16** no BACKLOG (2026-07-02) |
 | R2 | Confiabilidade | Supervisão de processo / auto-restart (recuperação de crash) | 🔗 estende B8 |
-| R3 | Confiabilidade | Monitoramento-lite: logs persistentes + polling do `/health` + alerta básico | 🆕 |
+| R3 | Confiabilidade | Monitoramento-lite: polling do `/health` + alerta básico | 🆕 (fatia de logs → **M18** no BACKLOG) |
 | R4 | Portabilidade | Containerizar + tirar config hardcoded (env-driven, setup 1-comando) | 🆕 |
 | R5 | Enterprise | Caminho de importação/migração de dados do sistema anterior | 🆕 |
-| R6 | Enterprise | Log de auditoria de ações privilegiadas (usuários, logins, acesso a relatório) | 🆕 |
+| R6 | Enterprise | Log de auditoria de ações privilegiadas (usuários, logins, acesso a relatório) | 🆕 (fatia de auth → **M18** no BACKLOG) |
 | R7 | Enterprise | Colunas de auditoria (`created_at`/`updated_at`/autor) nas tabelas core | 🆕 |
-| R8 | Enterprise | Fluxo de reset de senha (admin-triggered + troca forçada) | 🆕 |
+| R8 | Enterprise | Fluxo de reset de senha (admin-triggered + troca forçada) | 🔗 absorvido → **M16** no BACKLOG (2026-07-02) |
 | R9 | Enterprise | Revogação de JWT / kill-switch de sessão | 🆕 depende de M2 |
 | R10 | Confiabilidade | Auditoria de timezone (consistência mobile + servidor) | 🆕 |
 
@@ -49,11 +49,9 @@
 > Confiabilidade é uma alegação até o primeiro incidente. Estes itens fazem o sistema se
 > comportar bem — e se recuperar sozinho — em ambientes não supervisionados.
 
-- 🆕 **R1 — Backups automáticos + restore testado**
-  Hoje só houve um `mysqldump` manual (no B20). Falta backup **agendado** e — igualmente
-  crítico — um procedimento de **restore documentado e efetivamente testado**. Para um sistema de
-  registro (odômetro/auditoria), perda de dados é catastrófica. Não confundir com B14
-  (retenção/particionamento) nem B17 (schema): isto é **backup & DR**.
+- 🔗 **R1 — Backups automáticos + restore testado** *(movido para o BACKLOG ativo como **A16** em 2026-07-02)*
+  Reclassificado na auditoria de 2026-07-02: backup + restore testado é **pré-requisito para os
+  testes com usuários** (usuários reais = dados reais), não trabalho pós-produção. Detalhe no A16.
 
 - 🔗 **R2 — Supervisão de processo / auto-restart** *(estende B8)*
   O B8 (serviço NSSM) está bloqueado por falta de admin, então o node provavelmente roda num
@@ -67,6 +65,9 @@
   **persistentes** (arquivo, não só console), **polling** externo do `/health`, e um **alerta**
   simples (e-mail/webhook) quando cair. Não é o stack completo de observabilidade — só o suficiente
   para saber antes do usuário.
+  > ✂️ **Fatia movida (2026-07-02):** a parte de **logs persistentes em arquivo** foi puxada para o
+  > BACKLOG ativo como **M18** (pré-requisito dos testes de usuários — sem B8, os logs morrem com o
+  > terminal). Fica aqui o restante: polling do `/health` + alerta.
 
 - 🔗 **Testes no núcleo transacional primeiro** *(reframe de B5/B9)*
   Antes de cobertura ampla, testar o que **corrompe dado** se quebrar: transações atômicas de
@@ -114,14 +115,18 @@
   As tabelas `correcoes` já auditam **correções** (append-only). Estender essa disciplina ao resto:
   criar/editar usuário, login (sucesso/falha), acesso a relatório admin. Trilha de auditoria é
   requisito comum em ambientes de compliance.
+  > ✂️ **Fatia movida (2026-07-02):** o log de **eventos de auth** (login sucesso/falha, logout) foi
+  > puxado para o BACKLOG ativo como **M18** (trilha mínima durante o período de testes). Fica aqui
+  > o restante: acesso a relatório, criar/editar usuário, e eventual persistência em tabela.
 
 - 🆕 **R7 — Colunas de auditoria nas tabelas core**
   `created_at`/`updated_at` (+ autor) nas tabelas principais. Sem isso, "quando/quem mudou esta
   linha?" é sem resposta. **Verificar o que já existe** antes de adicionar.
 
-- 🆕 **R8 — Fluxo de reset de senha**
-  Hoje, se um usuário esquece a senha, o único caminho é o admin recriar a conta. Num deploy externo
-  isso não escala. Reset admin-triggered + troca forçada no próximo login. (MFA fica de fora por ora.)
+- 🔗 **R8 — Fluxo de reset de senha** *(absorvido pelo **M16** no BACKLOG em 2026-07-02)*
+  A auditoria de 2026-07-02 constatou que o problema é maior que reset: a API de funcionários não tem
+  **nenhum** update (sem desativar, sem editar). O reset virou sub-item do **M16** (ciclo de vida de
+  funcionários), no backlog ativo. (MFA continua fora de escopo.)
 
 - 🆕 **R9 — Revogação de JWT / kill-switch de sessão** *(depende de M2)*
   Token é stateless com expiração de 2h; um token copiado vale as 2h inteiras e **não dá para matar**.
