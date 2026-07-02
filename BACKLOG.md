@@ -37,7 +37,6 @@
 | M15 | Front/Infra | 🟡 | ⬜ | Offline/fila de submissão (PWA, exige HTTPS) |
 | M16 | Back+Front | 🟡 | ⬜ | Ciclo de vida de funcionários (desativar/editar/reset; absorve R8) |
 | M17 | Back+Front | 🟡 | ⬜ | Gestão de frota pelo admin (CRUD de veículos) |
-| M18 | Back | 🟡 | ⬜ | Logs persistentes em arquivo + eventos de auth (fatia de R3/R6) |
 | B5 | Test | 🟢 | ⬜ | Sem testes automatizados (priorizar serviços transacionais) |
 | M1-b | Front | 🟢 | ⬜ | Handlers inline `on*=` → `addEventListener` (sub-M1) |
 | M1-c | Front | 🟢 | ⬜ | Estilos inline → CSS (sub-M1) |
@@ -169,19 +168,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   - `POST /admin/veiculos` e `PATCH /admin/veiculos/:id` (modelo/placa/status) + UI admin.
   - **`km_atual` fica FORA** deste item — correção de âncora já tem caminho auditado e gated
     (A7 §6.2, `PATCH /correcoes/veiculo/:id/km`); não criar um segundo caminho de escrita sem auditoria.
-
-- ⬜ **M18 — Logs persistentes em arquivo + eventos de auth** *(fatia pré-teste dos R3/R6 do ROADMAP; auditoria 2026-07-02)*
-  O `logger.js` escreve em stdout/stderr e o **B8** (NSSM, que capturaria os streams em
-  `backend/logs/`) está bloqueado por falta de admin — hoje **todo log morre com a janela do
-  terminal**. Um crash durante os testes com usuários seria indiagnosticável. Além disso, nada
-  registra login (sucesso/falha) — sem trilha de auditoria durante o período de feedback.
-  - **Sink de arquivo** no `logger.js`: append em `backend/logs/` (já no `.gitignore`), rotação
-    simples por tamanho/dia. Sem dependência nova, sem admin.
-  - **Eventos de auth em nível `info`:** login sucesso/falha (matrícula + IP — finalidade legítima
-    LGPD, diferente do PII de debug removido no A14) e logout.
-  - O restante do R3 (polling do `/health` + alerta) e do R6 (acesso a relatório, CRUD de usuário)
-    **fica no ROADMAP**. Parcialmente superseded pelo B8 quando o gestor instalar o serviço — o sink
-    próprio continua útil (formato consistente, independe do SO).
 
 ---
 
@@ -328,4 +314,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, M10, M13, M14, A12, A15, A16, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M10, M13, M14, M18, A12, A15, A16, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.

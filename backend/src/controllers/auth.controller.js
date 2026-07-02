@@ -2,6 +2,8 @@ const pool = require('../config/database');
 const authService = require('../services/auth.service');
 const funcionarioRepository = require('../repositories/funcionario.repository');
 const response = require('../utils/response');
+const logger = require('../utils/logger');
+const { ERROR_CODES } = require('../utils/constants');
 const {
     TOKEN_COOKIE_NAME,
     setCookieOptions,
@@ -26,9 +28,18 @@ const authController = {
             // cookie carrega a credencial em toda requisição.
             res.cookie(TOKEN_COOKIE_NAME, result.token, setCookieOptions());
 
+            // M18: trilha de auth. Matrícula + IP têm finalidade legítima (LGPD),
+            // diferente do PII de debug (KM). Nível info → visível em produção.
+            logger.info(`[AUTH] login OK matricula=${result.user.matricula} ip=${req.ip}`);
+
             return response.success(res, { user: result.user }, 'Login realizado com sucesso');
 
         } catch (err) {
+            // M18: registra a TENTATIVA falha (credencial inválida) em warn — sinal
+            // de segurança (grep/brute-force). Outros erros seguem para o handler.
+            if (err && err.code === ERROR_CODES.AUTH_FAILED) {
+                logger.warn(`[AUTH] login FALHOU matricula=${req.body?.matricula ?? '?'} ip=${req.ip}`);
+            }
             next(err);
         } finally {
             if (conn) conn.release();
@@ -42,6 +53,9 @@ const authController = {
      */
     async logout(req, res) {
         res.clearCookie(TOKEN_COOKIE_NAME, clearCookieOptions());
+        // M18: rota pública (cookie-only), então a matrícula não é conhecida aqui —
+        // registra o evento com o IP.
+        logger.info(`[AUTH] logout ip=${req.ip}`);
         return response.success(res, null, 'Logout realizado com sucesso');
     },
 

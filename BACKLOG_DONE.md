@@ -479,6 +479,27 @@ Todos `authenticate` → `authorize(VISTORIADOR, ADMIN)` → `validate(...)`; CS
 
 ## 🟡 Médio — concluído
 
+- ✅ **M18 — Logs persistentes em arquivo + eventos de auth** *(implementado e verificado no servidor vivo em 2026-07-02)*
+  Antes, o `logger.js` só escrevia em stdout/stderr e o **B8** (NSSM, que capturaria os streams) segue
+  bloqueado por falta de admin — todo log morria com a janela do terminal. Duas entregas, sem dependência
+  nova e sem admin:
+  - **Sink de arquivo** no `logger.js`: além do console, cada linha (dentro do `LOG_LEVEL`) é anexada
+    (`appendFileSync` — a última linha antes de um crash já fica em disco) a
+    `logs/carcheck-<YYYY-MM-DD>.log`. Rotação **diária**; arquivos além de `LOG_RETENTION_DAYS` (default 30)
+    são apagados na carga. `LOG_DIR` é resolvido pelo caminho do arquivo (`__dirname`), então independe do
+    CWD. Qualquer falha de I/O rebaixa para só-console — o sink **nunca** derruba o app. Novos envs no
+    `.env.example`: `LOG_DIR`, `LOG_RETENTION_DAYS`.
+  - **Eventos de auth** no `auth.controller.js`: `login OK` (info), `login FALHOU` (warn — sinal de
+    brute-force para grep), `logout` (info), todos com IP. Matrícula + IP têm finalidade legítima (LGPD),
+    diferente do PII de debug (KM) que segue suprimido em produção.
+  - **Verificado no servidor vivo:** curl gerou 200/401/200; o arquivo do dia registrou banner de startup,
+    conexão do DB, `login OK matricula=3 ip=…`, `login FALHOU …`, `logout …` e o SIGINT de shutdown — o
+    IP real do cliente veio via `trust proxy`. O `LOG_LEVEL=info` de produção manteve o debug (PII) fora do
+    disco, como esperado.
+  - **Fica no ROADMAP:** o resto do R3 (polling de `/health` + alerta) e do R6 (acesso a relatório, CRUD de
+    usuário). Parcialmente superseded pelo B8 quando o gestor instalar o serviço — o sink próprio continua
+    útil (formato consistente, independe do SO).
+
 - ✅ **M12 — Invariantes de KM no nível do banco (defense-in-depth)** *(concluído em 2026-07-01; DDL aplicado no banco vivo)*
   Toda regra de KM vivia só no código (Zod); uma escrita direta / futuro segundo escritor / bug furava tudo.
   Adicionados CHECK constraints (MariaDB 10.4 impõe) — aplicados no vivo, **todos os ALTER passaram sem erro**
