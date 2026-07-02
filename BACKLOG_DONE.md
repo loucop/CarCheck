@@ -27,6 +27,20 @@
 
 ## 🟠 Alto — concluído
 
+- ✅ **A15 — Migração de senhas concluída + login bcrypt-only** *(verificado no banco/servidor vivo em 2026-07-02)*
+  Rodada a migração (`scripts/migrate-passwords.js`) contra o banco vivo após backup de segurança (A16):
+  dry-run e gravação retornaram **0 linhas em texto plano** — todos os 6 funcionários já estavam em
+  bcrypt (`createFuncionario` sempre hasheia). Com o banco comprovadamente limpo, o **branch de texto
+  plano foi removido** do `auth.service.js`: login agora é **bcrypt-only**, o que fecha o caveat de timing
+  do **M13** (não há mais caminho de comparação `===` rápido). Uma senha não-bcrypt no banco (não deve
+  ocorrer) passa a **falhar fechada** — iguala o timing via `DUMMY_HASH`, recusa, e loga `warn` para
+  diagnóstico. **Verificação no servidor vivo:** `POST /api/login` com admin real → 200 + user; senha
+  errada → 401 `AUTH_FAILED`.
+  - **Micro-fix embutido (defense-in-depth):** default de `JWT_EXPIRES_IN` no código passou de `12h` p/
+    `2h` (`auth.service.js` + `cookie.js`), alinhando o fallback à postura documentada — se a env faltar,
+    a janela do token não sextuplica mais em silêncio. No-op no ambiente atual (o `.env` já traz `2h`).
+    Docs alinhados (`.env.example`, `README.md`).
+
 - ✅ **A16 — Backups agendados do banco + restore testado** *(implementado e testado no servidor em 2026-07-02)*
   Dois scripts Node standalone que shell-out para o `mysqldump`/`mysql` do XAMPP, leem credenciais do
   `backend/.env` por **caminho absoluto** (independem do CWD do Agendador de Tarefas) e passam a senha via

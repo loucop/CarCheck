@@ -29,7 +29,6 @@
 | ID | Domínio | Pri | St | Resumo |
 |------|-----------|----|----|--------|
 | A7 | Front | 🟠 | 🔵 | UI de correção do vistoriador (slice 4; backend pronto) |
-| A15 | Back/Infra | 🟠 | ⬜ | Rodar migração de senhas em prod + aposentar plaintext |
 | M1 | Back/Infra | 🟡 | 🔵 | Helmet (backend ✅); CSP do HTML via Cloudflare |
 | M2 | Back/Infra | 🟡 | ⬜ | Rate limiter resiliente (store compartilhado) |
 | M6 | Arch | 🟡 | ⬜ | Planejamento de multi-tenancy (RFC antes de código) |
@@ -89,18 +88,6 @@ _Nenhum item crítico pendente._ (C1 concluído → [`BACKLOG_DONE.md`](BACKLOG_
   (filesystem / object storage Cloudflare R2/S3), guardando só a URL/chave — mantém `checklists`
   pequena/quente e torna o particionamento/arquivamento trivial. Pareia com **B14** (retenção) e só
   vale a pena junto da publicação/Cloudflare.
-
-- ⬜ **A15 — Executar a migração de senhas em produção + aposentar o dual-support de plaintext** *(auditoria 2026-07-02)*
-  O script `scripts/migrate-passwords.js` foi corrigido e endurecido no **A5**, mas **nunca foi
-  executado** no banco vivo: senhas legadas seguem em texto plano, comparadas com `===` no
-  `auth.service.js` — o que anula o **M13** para esses usuários (a igualação de timing só vale no
-  caminho bcrypt) e deixa credenciais legíveis no banco.
-  - **Plano:** `--dry-run` contra o banco vivo → backup da tabela `funcionarios` → rodar com
-    `--i-know-its-fixed` → validar logins reais → em sessão futura, **remover o branch plaintext**
-    do `auth.service` (login vira bcrypt-only, fechando também o caveat de timing do M13).
-  - **Micro-fix embutido:** o default de `JWT_EXPIRES_IN` no código é `12h` (`auth.service.js` +
-    `cookie.js`), mas a postura documentada é `2h` — se a env faltar, a janela do token sextuplica
-    em silêncio. Trocar ambos os defaults para `2h`.
 
 ---
 
@@ -341,4 +328,4 @@ a decisões já registradas (A2, M1, S3 — esta última em [`BACKLOG_DONE.md`](
 
 Itens concluídos (✅) e o histórico das fases já entregues dos 🔵 vivem em
 **[`BACKLOG_DONE.md`](BACKLOG_DONE.md)** — incluindo C1, A1–A6, A9, A10, a auditoria de SQL injection,
-M3, M4, M10, M13, M14, A12, A16, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.
+M3, M4, M10, M13, M14, A12, A15, A16, B3, B7, a série S1–S3, B6, e as porções concluídas de A7 (spec/slices 1–3), M1 (helmet) e M5/M5-b.

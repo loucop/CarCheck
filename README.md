@@ -113,7 +113,7 @@ CarCheck digitizes vehicle inspection workflows and daily trip logs (BDV) for op
     PORT=3000
     HOST=0.0.0.0
     JWT_SECRET=change_in_production
-    JWT_EXPIRES_IN=12h
+    JWT_EXPIRES_IN=2h
     NODE_ENV=production
 
 ---

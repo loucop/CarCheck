@@ -11,9 +11,9 @@ const TOKEN_COOKIE_NAME = 'token';
 /**
  * Converte uma duração no formato do jsonwebtoken (ex.: '2h', '12h', '7d',
  * '30m', '45s', ou um número em segundos) para milissegundos — necessário
- * para o maxAge do cookie. Default: 12h.
+ * para o maxAge do cookie. Default: 2h (alinhado à postura JWT_EXPIRES_IN=2h).
  */
-function parseDurationMs(value, defaultMs = 12 * 60 * 60 * 1000) {
+function parseDurationMs(value, defaultMs = 2 * 60 * 60 * 1000) {
     if (value == null || value === '') return defaultMs;
 
     // Número puro -> segundos (semântica do jsonwebtoken)
